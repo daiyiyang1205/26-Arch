@@ -15,11 +15,11 @@ module alu(
             3'b100: result = a ^ b;
             3'b101: begin
                 temp = a[31:0] + b[31:0];
-                result = {{32{temp[31]}}, temp[31:0]};
+                result = {{32{temp[31]}}, temp};
             end
             3'b110: begin
                 temp = a[31:0] - b[31:0];
-                result = {{32{temp[31]}}, temp[31:0]};
+                result = {{32{temp[31]}}, temp};
             end
             default: result = 0;
         endcase
