@@ -8,7 +8,7 @@ module datapath import common::*;(
     input  logic alusrc,
     input  logic [2:0] alucontrol,
     input  logic [63:0] pcinit,
-    output logic [31:0] instr,
+    input logic [31:0] instr,
 
     output ibus_req_t  ireq,
 	input  ibus_resp_t iresp);
