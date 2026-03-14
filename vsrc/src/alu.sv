@@ -24,4 +24,5 @@ module alu(
             default: result = 0;
         endcase
     end
+
 endmodule

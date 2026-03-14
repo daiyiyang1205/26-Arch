@@ -14,19 +14,11 @@ module core import common::*;(
 	input  logic       trint, swint, exint
 );
 	/* TODO: Add your CPU-Core here. */
-
-logic [31:0] instr;
-logic regwrite, alusrc;
-logic [2:0] alucontrol;
-    
-controller con(instr[6:0], instr[14:12], instr[31:25],
-            regwrite, alusrc,
-            alucontrol);
     
 datapath dp(clk, reset,
-            regwrite, alusrc,
-            alucontrol,
-            PCINIT, instr, ireq, iresp);
+    		PCINIT,
+    		iresp,
+    		ireq);
 
 `ifdef VERILATOR
 	DifftestInstrCommit DifftestInstrCommit(

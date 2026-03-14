@@ -1,0 +1,27 @@
+`ifdef VERILATOR
+`include "include/common.sv"
+`endif
+
+module memory import common::*;(
+    input  logic clk, reset,
+    input  logic step, // 这个信号用来同步整个 CPU 的时序，当其为 1 时，整个 CPU 流水线向前移动一个指令。
+    output logic memory_ok // 表示当前模块是否已经准备好接受下一条指令了
+    // 实际上 step = fetch_ok & decode_ok & execute_ok & memory_ok & writeback_ok; 也就是说，只有当五个阶段都准备好接受下一条指令了，step 才会为 1。
+    );
+
+always_ff @(posedge clk) begin
+    if (reset) begin
+        memory_ok <= 1;
+    end else if (step) begin
+        memory_ok <= 0; // 先把 execute_ok 置为 0，表示我们正在处理当前指令，还没有准备好接受下一条指令了。
+    end else begin
+        // 这里对应：要么我们还没执行好指令，要么我们执行好指令了，在等其他模块
+        if (memory_ok) begin
+            // 在等其他模块
+        end else begin
+            memory_ok <= 1;
+        end
+    end
+end
+
+endmodule

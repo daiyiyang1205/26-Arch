@@ -4,4 +4,5 @@ module mux2 #(parameter WIDTH = 64)
     output logic [WIDTH-1:0] y);  
     
     assign y = s ? d1 : d0;
+
 endmodule

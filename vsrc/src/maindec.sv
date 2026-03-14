@@ -1,7 +1,12 @@
 module maindec(
     input  logic [6:0] op,
-    output logic [1:0] controls);
+    output logic regwrite,
+    output logic alusrc);
     
+    logic [1:0] controls;
+
+    assign {regwrite, alusrc} = controls;
+
     always_comb
         case(op)
             7'b0110011: controls = 2'b10;
