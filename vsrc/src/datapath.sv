@@ -6,17 +6,24 @@ module datapath import common::*;(
     input  logic clk, reset,
     input  logic [63:0] pcinit,
     input  ibus_resp_t ibus_resp,
-    output ibus_req_t ibus_req);
+    output ibus_req_t ibus_req,
+    output logic [63:0] rf[31:0],
+    output logic writeback_ok,
+    output logic [63:0] pcW,
+    output logic [31:0] instrW,
+    output logic regwriteW,
+    output logic [4:0] writeRegW,
+    output logic [63:0] aluresultW);
 
 // pipeline control signal
 
-logic step, fetch_ok, decode_ok, execute_ok, memory_ok, writeback_ok;
+logic step, fetch_ok, decode_ok, execute_ok, memory_ok;
 
 assign step = fetch_ok & decode_ok & execute_ok & memory_ok & writeback_ok;
 
 // controller
 
-logic regwriteD, regwriteE, regwriteM, regwriteW;
+logic regwriteD, regwriteE, regwriteM;
 
 logic alusrcD, alusrcE;
 
@@ -44,26 +51,29 @@ enreg #(1) cregMW(clk, reset, step,
 
 // datapath
 
-logic [31:0] instrF, instrD;
+logic [63:0] pcF, pcD, pcE, pcM;
+
+logic [31:0] instrF, instrD, instrE, instrM;
 
 logic [63:0] readData1D, readData2D, readData1E, readData2E;
 
-logic [4:0] writeRegD, writeRegE, writeRegM, writeRegW;
+logic [4:0] writeRegD, writeRegE, writeRegM;
 
 logic [63:0] seimmD, seimmE;
 
-logic [63:0] aluresultE, aluresultM, aluresultW;
+logic [63:0] aluresultE, aluresultM;
 
 fetch fetch(clk, reset, step,
             fetch_ok,
-            instrF,
             pcinit,
             ibus_resp,
-            ibus_req);
+            ibus_req,
+            pcF, 
+            instrF);
 
-enreg #(32) dregFD(clk, reset, step,
-                instrF,
-                instrD);
+enreg #(96) dregFD(clk, reset, step,
+                {pcF, instrF},
+                {pcD, instrD});
 
 decode decode(clk, reset, step,
             decode_ok,
@@ -74,7 +84,8 @@ decode decode(clk, reset, step,
             readData1D,
             readData2D,
             writeRegD,
-            seimmD);
+            seimmD,
+            rf);
 
 // forward
 
@@ -98,9 +109,9 @@ always_comb begin
     end
 end
 
-enreg #(197) dregDE(clk, reset, step,
-                {true_readData1D, true_readData2D, writeRegD, seimmD},
-                {readData1E, readData2E, writeRegE, seimmE});
+enreg #(293) dregDE(clk, reset, step,
+                {true_readData1D, true_readData2D, writeRegD, seimmD, pcD, instrD},
+                {readData1E, readData2E, writeRegE, seimmE, pcE, instrE});
 
 execute execute(clk, reset, step,
                 execute_ok,
@@ -111,16 +122,16 @@ execute execute(clk, reset, step,
                 seimmE,
                 aluresultE);
 
-enreg #(69) dregEM(clk, reset, step,
-                {aluresultE, writeRegE},
-                {aluresultM, writeRegM});
+enreg #(165) dregEM(clk, reset, step,
+                {aluresultE, writeRegE, pcE, instrE},
+                {aluresultM, writeRegM, pcM, instrM});
 
 memory memory(clk, reset, step,
             memory_ok);
 
-enreg #(69) dregMW(clk, reset, step,
-                {aluresultM, writeRegM},
-                {aluresultW, writeRegW});
+enreg #(165) dregMW(clk, reset, step,
+                {aluresultM, writeRegM, pcM, instrM},
+                {aluresultW, writeRegW, pcW, instrW});
 
 always_ff @(posedge clk) begin
     if (reset) begin

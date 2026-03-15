@@ -14,9 +14,8 @@ module decode import common::*;(
     output logic [63:0] readData1,
     output logic [63:0] readData2,
     output logic [4:0] writeRegD,
-    output logic [63:0] seimm);
-
-logic [63:0] rf[31:0];
+    output logic [63:0] seimm,
+    output logic [63:0] rf[31:0]);
 
 logic [4:0] readAddr1;
 logic [4:0] readAddr2;

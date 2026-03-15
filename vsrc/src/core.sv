@@ -14,63 +14,84 @@ module core import common::*;(
 	input  logic       trint, swint, exint
 );
 	/* TODO: Add your CPU-Core here. */
-    
+
+logic [63:0] rf[31:0];
+
+logic writeback_ok;
+
+logic [63:0] pc;
+
+logic [31:0] instr;
+
+logic regwrite;
+
+logic [4:0] writeReg;
+
+logic [63:0] aluresult;
+
 datapath dp(clk, reset,
     		PCINIT,
     		iresp,
-    		ireq);
+    		ireq,
+			rf,
+			writeback_ok,
+			pc,
+			instr,
+			regwrite,
+			writeReg,
+			aluresult);
 
 `ifdef VERILATOR
 	DifftestInstrCommit DifftestInstrCommit(
 		.clock              (clk),
 		.coreid             (0),
 		.index              (0),
-		.valid              (1'b1),
-		.pc                 (PCINIT),
-		.instr              (0),
+		.valid              (writeback_ok),
+		.pc                 (pc),
+		.instr              (instr),
 		.skip               (0),
 		.isRVC              (0),
 		.scFailed           (0),
-		.wen                (0),
-		.wdest              (0),
-		.wdata              (0)
+		.wen                (regwrite),
+		.wdest              (writereg),
+		.wdata              (aluresult)
 	);
 
 	DifftestArchIntRegState DifftestArchIntRegState (
 		.clock              (clk),
 		.coreid             (0),
-		.gpr_0              (0),
-		.gpr_1              (0),
-		.gpr_2              (0),
-		.gpr_3              (0),
-		.gpr_4              (0),
-		.gpr_5              (0),
-		.gpr_6              (0),
-		.gpr_7              (0),
-		.gpr_8              (0),
-		.gpr_9              (0),
-		.gpr_10             (0),
-		.gpr_11             (0),
-		.gpr_12             (0),
-		.gpr_13             (0),
-		.gpr_14             (0),
-		.gpr_15             (0),
-		.gpr_16             (0),
-		.gpr_17             (0),
-		.gpr_18             (0),
-		.gpr_19             (0),
-		.gpr_20             (0),
-		.gpr_21             (0),
-		.gpr_22             (0),
-		.gpr_23             (0),
-		.gpr_24             (0),
-		.gpr_25             (0),
-		.gpr_26             (0),
-		.gpr_27             (0),
-		.gpr_28             (0),
-		.gpr_29             (0),
-		.gpr_30             (0),
-		.gpr_31             (0)
+		.gpr_0              (rf[0]),
+		.gpr_1              (rf[1]),
+		.gpr_2              (rf[2]),
+		.gpr_3              (rf[3]),
+		.gpr_4              (rf[4]),
+		.gpr_5              (rf[5]),
+		.gpr_6              (rf[6]),
+		.gpr_7              (rf[7]),
+		.gpr_8              (rf[8]),
+		.gpr_9              (rf[9]),
+		.gpr_10             (rf[10]),
+		.gpr_11             (rf[11]),
+		.gpr_12             (rf[12]),
+		.gpr_13             (rf[13]),
+		.gpr_14             (rf[14]),
+		.gpr_15             (rf[15]),
+		.gpr_16             (rf[16]),
+		.gpr_17             (rf[17]),
+		.gpr_18             (rf[18]),
+		.gpr_19             (rf[19]),
+		.gpr_20             (rf[20]),
+		.gpr_21             (rf[21]),
+		.gpr_22             (rf[22]),
+		.gpr_23             (rf[23]),
+		.gpr_24             (rf[24]),
+		.gpr_25             (rf[25]),
+		.gpr_26             (rf[26]),
+		.gpr_27             (rf[27]),
+		.gpr_28             (rf[28]),
+		.gpr_29             (rf[29]),
+		.gpr_30             (rf[30]),
+		.gpr_31             (rf[31])
 	);
 
     DifftestTrapEvent DifftestTrapEvent(
