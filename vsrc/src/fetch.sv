@@ -19,6 +19,8 @@ always_ff @(posedge clk) begin
     if (reset) begin
         pc <= pcinit;
         fetch_ok <= 1;
+        ibus_req.valid <= 0;
+        ibus_req.addr <= 0;
     end else if (step) begin
         fetch_ok <= 0; // 先把 fetch_ok 置为 0，表示我们正在处理当前指令，还没有准备好接受下一条指令了。
         ibus_req.valid <= 1; // 置为 1，表示我们要求取指令了。

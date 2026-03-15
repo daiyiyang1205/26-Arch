@@ -14,7 +14,7 @@ module datapath import common::*;(
     input  ibus_resp_t ibus_resp,
     output ibus_req_t ibus_req,
     output logic [63:0] rf[31:0],
-    output logic writeback_ok,
+    output logic valid,
     output logic [63:0] pcW,
     output logic [31:0] instrW,
     output logic regwriteW,
@@ -23,7 +23,7 @@ module datapath import common::*;(
 
 // pipeline control signal
 
-logic step, fetch_ok, decode_ok, execute_ok, memory_ok;
+logic step, fetch_ok, decode_ok, execute_ok, memory_ok, writeback_ok;
 
 assign step = fetch_ok & decode_ok & execute_ok & memory_ok & writeback_ok;
 
@@ -99,8 +99,8 @@ logic [63:0] true_readData1D, true_readData2D;
 
 logic [4:0] sreg1, sreg2;
 
-assign sreg1 = instrD[24:20];
-assign sreg2 = instrD[19:15];
+assign sreg2 = instrD[24:20];
+assign sreg1 = instrD[19:15];
 
 always_comb begin
     true_readData1D = readData1D;
@@ -151,6 +151,18 @@ always_ff @(posedge clk) begin
         end else begin
             writeback_ok <= 1;
         end
+    end
+end
+
+// difftest pin
+
+always_ff @(posedge clk) begin
+    if (reset) begin
+        valid <= 0;
+    end else if (writeback_ok) begin
+        valid <= (instrW != 0);
+    end else begin
+        valid <= 0;
     end
 end
     

@@ -30,12 +30,14 @@ logic [4:0] writeReg;
 
 logic [63:0] aluresult;
 
+logic valid;
+
 datapath dp(clk, reset,
     		PCINIT,
     		iresp,
     		ireq,
 			rf,
-			writeback_ok,
+			valid,
 			pc,
 			instr,
 			regwrite,
@@ -47,7 +49,7 @@ datapath dp(clk, reset,
 		.clock              (clk),
 		.coreid             (0),
 		.index              (0),
-		.valid              (writeback_ok),
+		.valid              (valid),
 		.pc                 (pc),
 		.instr              (instr),
 		.skip               (0),
