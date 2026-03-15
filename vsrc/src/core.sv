@@ -3,6 +3,7 @@
 
 `ifdef VERILATOR
 `include "include/common.sv"
+`include "src/datapath.sv"
 `endif
 
 module core import common::*;(

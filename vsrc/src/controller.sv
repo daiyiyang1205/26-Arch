@@ -1,3 +1,8 @@
+`ifdef VERILATOR
+`include "src/maindec.sv"
+`include "src/aludec.sv"
+`endif
+
 module controller(
     input  logic clk, reset,
     input  logic [6:0] op,

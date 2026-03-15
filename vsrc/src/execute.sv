@@ -1,5 +1,7 @@
 `ifdef VERILATOR
 `include "include/common.sv"
+`include "src/mux2.sv"
+`include "src/alu.sv"
 `endif
 
 module execute import common::*;(

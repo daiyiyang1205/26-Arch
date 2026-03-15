@@ -1,5 +1,11 @@
 `ifdef VERILATOR
 `include "include/common.sv"
+`include "src/controller.sv"
+`include "src/enreg.sv"
+`include "src/fetch.sv"
+`include "src/decode.sv"
+`include "src/execute.sv"
+`include "src/memory.sv"
 `endif
 
 module datapath import common::*;(
