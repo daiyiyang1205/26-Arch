@@ -53,7 +53,7 @@ datapath dp(clk, reset,
 		.isRVC              (0),
 		.scFailed           (0),
 		.wen                (regwrite),
-		.wdest              (writereg),
+		.wdest              (writeReg),
 		.wdata              (aluresult)
 	);
 
