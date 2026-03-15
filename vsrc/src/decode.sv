@@ -15,7 +15,9 @@ module decode import common::*;(
     output logic [63:0] readData2,
     output logic [4:0] writeRegD,
     output logic [63:0] seimm,
-    output logic [63:0] rf[31:0]);
+    output logic [63:0] next_reg[31:0]); // 输出寄存器
+
+logic [63:0] rf[31:0]; // 主寄存器
 
 logic [4:0] readAddr1;
 logic [4:0] readAddr2;
@@ -27,10 +29,21 @@ assign readAddr1 = instr[19:15];
 
 assign imm = instr[31:20];
 
-assign readData1 = (readAddr1 == 0) ? 0 : rf[readAddr1];
-assign readData2 = (readAddr2 == 0) ? 0 : rf[readAddr2];
+assign readData1 = (readAddr1 == 0) ? 0 : next_reg[readAddr1];
+assign readData2 = (readAddr2 == 0) ? 0 : next_reg[readAddr2];
 assign writeRegD = instr[11:7];
 assign seimm = {{52{imm[11]}}, imm};
+
+always_comb begin
+	for (int i = 0; i < 32; i++) begin
+		if (regwrite && (i != 0) && (i[4:0] == writeAddr3)) begin
+			next_reg[i[4:0]] = writeData3; // 用组合逻辑向next_reg写入
+		end else begin
+			next_reg[i[4:0]] = rf[i[4:0]]; // 复制其他没有写入的寄存器
+		end
+	end
+end
+
 
 always_ff @(posedge clk) begin
     if (reset) begin

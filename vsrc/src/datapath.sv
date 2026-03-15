@@ -13,7 +13,7 @@ module datapath import common::*;(
     input  logic [63:0] pcinit,
     input  ibus_resp_t ibus_resp,
     output ibus_req_t ibus_req,
-    output logic [63:0] rf[31:0],
+    output logic [63:0] next_reg[31:0],
     output logic valid,
     output logic [63:0] pcW,
     output logic [31:0] instrW,
@@ -91,7 +91,7 @@ decode decode(clk, reset, step,
             readData2D,
             writeRegD,
             seimmD,
-            rf);
+            next_reg);
 
 // forward
 
@@ -156,14 +156,6 @@ end
 
 // difftest pin
 
-always_ff @(posedge clk) begin
-    if (reset) begin
-        valid <= 0;
-    end else if (writeback_ok) begin
-        valid <= (instrW != 0);
-    end else begin
-        valid <= 0;
-    end
-end
+assign valid = step & (instrW != 0);
     
 endmodule
