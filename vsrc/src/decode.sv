@@ -37,7 +37,7 @@ always_ff @(posedge clk) begin
         decode_ok <= 1;
     end else if (step) begin
         decode_ok <= 0; // 先把 decode_ok 置为 0，表示我们正在处理当前指令，还没有准备好接受下一条指令了。
-        if (regwrite) rf[writeAddr3] = writeData3;
+        if (regwrite) rf[writeAddr3] <= writeData3;
     end else begin
         // 这里对应：要么我们还没译码好指令，要么我们译码好指令了，在等其他模块
         if (decode_ok) begin
