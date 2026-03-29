@@ -15,7 +15,7 @@ module execute import common::*;(
     input  logic [63:0] readData1,
     input  logic [63:0] readData2,
     input  logic [63:0] seimm,
-    output logic [63:0] seuimm,
+    input  logic [63:0] seuimm,
     output logic [63:0] result);
 
 logic [63:0] srca, srcb;

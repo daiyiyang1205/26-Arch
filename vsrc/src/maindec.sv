@@ -16,7 +16,7 @@ always_comb
 
         7'b0011011: controls = 7'b1010000; // I
 
-        7'b0111011: controls = 7'b1010000; // I
+        7'b0111011: controls = 7'b1000000; // R
 
         7'b0000011: controls = 7'b1010101; // I Load
 
