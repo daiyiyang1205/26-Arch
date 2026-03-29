@@ -2,6 +2,7 @@
 `include "include/common.sv"
 `include "src/maindec.sv"
 `include "src/aludec.sv"
+`include "src/memdec.sv"
 `endif
 
 module controller import common::*;(

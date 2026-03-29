@@ -1,3 +1,6 @@
+`ifndef MUX2_SV
+`define MUX2_SV
+
 module mux2 #(parameter WIDTH = 64)
     (input logic [WIDTH-1:0] d0, d1,
     input  logic s,
@@ -6,3 +9,5 @@ module mux2 #(parameter WIDTH = 64)
     assign y = s ? d1 : d0;
 
 endmodule
+
+`endif

@@ -141,8 +141,8 @@ always_comb begin
     true_readData1D = readData1D;
     true_readData2D = readData2D;
     if (regwriteM && writeRegM != 0) begin
-        if (writeRegM == sreg1) true_readData1D = aluresultM;
-        if (writeRegM == sreg2) true_readData2D = aluresultM;
+        if (writeRegM == sreg1) true_readData1D = memresultM;
+        if (writeRegM == sreg2) true_readData2D = memresultM;
     end
     if (regwriteE && writeRegE != 0) begin
         if (writeRegE == sreg1) true_readData1D = aluresultE;
