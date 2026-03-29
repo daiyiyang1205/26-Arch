@@ -26,21 +26,23 @@ logic regwrite;
 
 logic [4:0] writeReg;
 
-logic [63:0] aluresult;
+logic [63:0] memresult;
 
 logic valid;
 
 datapath dp(clk, reset,
     		PCINIT,
     		iresp,
+			dresp,
     		ireq,
+			dreq,
 			next_reg,
 			valid,
 			pc,
 			instr,
 			regwrite,
 			writeReg,
-			aluresult);
+			memresult);
 
 `ifdef VERILATOR
 	DifftestInstrCommit DifftestInstrCommit(
@@ -55,7 +57,7 @@ datapath dp(clk, reset,
 		.scFailed           (0),
 		.wen                (regwrite),
 		.wdest              ({3'b0, writeReg}),
-		.wdata              (aluresult)
+		.wdata              (memresult)
 	);
 
 	DifftestArchIntRegState DifftestArchIntRegState (

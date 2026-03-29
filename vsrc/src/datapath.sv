@@ -12,14 +12,16 @@ module datapath import common::*;(
     input  logic clk, reset,
     input  logic [63:0] pcinit,
     input  ibus_resp_t ibus_resp,
-    output ibus_req_t ibus_req,
+    input  dbus_resp_t dbus_resp,
+    output ibus_req_t  ibus_req,
+    output dbus_req_t  dbus_req,
     output logic [63:0] next_reg[31:0],
     output logic valid,
     output logic [63:0] pcW,
     output logic [31:0] instrW,
     output logic regwriteW,
     output logic [4:0] writeRegW,
-    output logic [63:0] aluresultW);
+    output logic [63:0] memresultW);
 
 // pipeline control signal
 
@@ -31,25 +33,50 @@ assign step = fetch_ok & decode_ok & execute_ok & memory_ok & writeback_ok;
 
 logic regwriteD, regwriteE, regwriteM;
 
+logic immcat;
+
 logic alusrcD, alusrcE;
 
 logic [2:0] alucontrolD, alucontrolE;
 
-controller con(clk, reset,
+logic upperregD, upperregE;
+
+logic memreadD, memreadE, memreadM;
+
+logic memwriteD, memwriteE, memwriteM;
+
+logic signextendD, signextendE, signextendM;
+
+msize_t memsizeD, memsizeE, memsizeM;
+
+logic memtoregD, memtoregE, memtoregM;
+
+controller ctlr(clk, reset,
             instrD[6:0], 
             instrD[14:12], 
             instrD[31:25],
             regwriteD,
+            immcat,
             alusrcD,
-            alucontrolD);
+            alucontrolD,
+            upperregD,
+            memreadD,
+            memwriteD,
+            signextendD,
+            memsizeD,
+            memtoregD);
 
-enreg #(5) cregDE(clk, reset, step,
-                {regwriteD, alusrcD, alucontrolD},
-                {regwriteE, alusrcE, alucontrolE});
+enreg #(13) cregDE(clk, reset, step,
+                {regwriteD, alusrcD, alucontrolD, upperregD,
+                memreadD, memwriteD, signextendD, memsizeD, memtoregD},
+                {regwriteE, alusrcE, alucontrolE, upperregE,
+                memreadE, memwriteE, signextendE, memsizeE, memtoregE});
 
-enreg #(1) cregEM(clk, reset, step,
-                regwriteE,
-                regwriteM);
+enreg #(8) cregEM(clk, reset, step,
+                {regwriteE, memreadE, memwriteE, 
+                signextendE, memsizeE, memtoregE}, 
+                {regwriteM, memreadM, memwriteM, 
+                signextendM, memsizeM, memtoregM});
 
 enreg #(1) cregMW(clk, reset, step,
                 regwriteM,
@@ -61,13 +88,19 @@ logic [63:0] pcF, pcD, pcE, pcM;
 
 logic [31:0] instrF, instrD, instrE, instrM;
 
-logic [63:0] readData1D, readData2D, readData1E, readData2E;
+logic [63:0] readData1D, readData1E;
+
+logic [63:0] readData2D, readData2E, readData2M;
 
 logic [4:0] writeRegD, writeRegE, writeRegM;
 
 logic [63:0] seimmD, seimmE;
 
+logic [63:0] seuimmD, seuimmE;
+
 logic [63:0] aluresultE, aluresultM;
+
+logic [63:0] memresultM;
 
 fetch fetch(clk, reset, step,
             fetch_ok,
@@ -85,12 +118,14 @@ decode decode(clk, reset, step,
             decode_ok,
             instrD,
             regwriteW,
+            immcat,
             writeRegW,
-            aluresultW,
+            memresultW,
             readData1D,
             readData2D,
             writeRegD,
             seimmD,
+            seuimmD,
             next_reg);
 
 // forward
@@ -115,29 +150,41 @@ always_comb begin
     end
 end
 
-enreg #(293) dregDE(clk, reset, step,
-                {true_readData1D, true_readData2D, writeRegD, seimmD, pcD, instrD},
-                {readData1E, readData2E, writeRegE, seimmE, pcE, instrE});
+enreg #(357) dregDE(clk, reset, step,
+                {true_readData1D, true_readData2D, writeRegD, seimmD, seuimmD, pcD, instrD},
+                {readData1E, readData2E, writeRegE, seimmE, seuimmE, pcE, instrE});
 
 execute execute(clk, reset, step,
                 execute_ok,
                 alusrcE,
                 alucontrolE,
+                upperregE,
                 readData1E,
                 readData2E,
                 seimmE,
+                seuimmE,
                 aluresultE);
 
-enreg #(165) dregEM(clk, reset, step,
-                {aluresultE, writeRegE, pcE, instrE},
-                {aluresultM, writeRegM, pcM, instrM});
+enreg #(229) dregEM(clk, reset, step,
+                {aluresultE, readData2E, writeRegE, pcE, instrE},
+                {aluresultM, readData2M, writeRegM, pcM, instrM});
 
 memory memory(clk, reset, step,
-            memory_ok);
+            memory_ok,
+            memreadM,
+            memwriteM,
+            signextendM,
+            memsizeM,
+            memtoregM,
+            aluresultM,
+            readData2M,
+            dbus_resp,
+            dbus_req,
+            memresultM);
 
 enreg #(165) dregMW(clk, reset, step,
-                {aluresultM, writeRegM, pcM, instrM},
-                {aluresultW, writeRegW, pcW, instrW});
+                {memresultM, writeRegM, pcM, instrM},
+                {memresultW, writeRegW, pcW, instrW});
 
 always_ff @(posedge clk) begin
     if (reset) begin
