@@ -2,6 +2,7 @@
 `include "include/common.sv"
 `include "src/controller.sv"
 `include "src/enreg.sv"
+`include "src/stallreg.sv"
 `include "src/fetch.sv"
 `include "src/decode.sv"
 `include "src/execute.sv"
@@ -28,6 +29,19 @@ module datapath import common::*;(
 logic step, fetch_ok, decode_ok, execute_ok, memory_ok, writeback_ok;
 
 assign step = fetch_ok & decode_ok & execute_ok & memory_ok & writeback_ok;
+
+// stall
+
+logic stall;
+
+logic [4:0] readAddr1, readAddr2;
+
+assign readAddr1 = instrD[19:15];
+
+assign readAddr2 = instrD[24:20];
+
+assign stall = memreadE & (writeRegE != 0) 
+                & ((writeRegE == readAddr1) || (writeRegE == readAddr2)); 
 
 // controller
 
@@ -66,7 +80,7 @@ controller ctlr(clk, reset,
             memsizeD,
             memtoregD);
 
-enreg #(13) cregDE(clk, reset, step,
+stallreg #(13) cregDE(clk, reset, step, stall,
                 {regwriteD, alusrcD, alucontrolD, upperregD,
                 memreadD, memwriteD, signextendD, memsizeD, memtoregD},
                 {regwriteE, alusrcE, alucontrolE, upperregE,
@@ -104,6 +118,7 @@ logic [63:0] memresultM;
 
 fetch fetch(clk, reset, step,
             fetch_ok,
+            stall,
             pcinit,
             ibus_resp,
             ibus_req,
@@ -150,7 +165,7 @@ always_comb begin
     end
 end
 
-enreg #(357) dregDE(clk, reset, step,
+stallreg #(357) dregDE(clk, reset, step, stall,
                 {true_readData1D, true_readData2D, writeRegD, seimmD, seuimmD, pcD, instrD},
                 {readData1E, readData2E, writeRegE, seimmE, seuimmE, pcE, instrE});
 
