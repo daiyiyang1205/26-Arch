@@ -46,6 +46,8 @@ always_comb begin
     aligned_writedata = writedata << (offset * 8);
 end
 
+logic busy;
+
 logic [63:0] readdata;
 
 always_ff @(posedge clk) begin
@@ -55,9 +57,11 @@ always_ff @(posedge clk) begin
         dbus_req.addr <= 0;
         dbus_req.strobe <= 0;
         dbus_req.data <= 0;
+        busy <= 0;
     end else if (step) begin
         memory_ok <= 0; // 先把 execute_ok 置为 0，表示我们正在处理当前指令，还没有准备好接受下一条指令了。
-        
+        busy <= 1;
+    end else if (busy) begin
         // read
         if (re) begin
             dbus_req.valid <= 1; // 置为 1，表示我们要求读数据了。
@@ -65,6 +69,7 @@ always_ff @(posedge clk) begin
             dbus_req.size <= size;
             dbus_req.strobe <= 8'b0;
             dbus_req.data <= 0;
+            busy <= 0;
         end
 
         //write
@@ -74,9 +79,15 @@ always_ff @(posedge clk) begin
             dbus_req.size <= size;
             dbus_req.strobe <= strobe;
             dbus_req.data <= aligned_writedata;
+            busy <= 0;
         end
 
-    end else begin
+        // no read and write
+        else begin
+            busy <= 0;
+        end
+    end
+    else begin
         // 这里对应：要么我们还没执行好指令，要么我们执行好指令了，在等其他模块
         if (memory_ok) begin
             // 在等其他模块
@@ -103,7 +114,9 @@ always_ff @(posedge clk) begin
     end
 end
 
-logic [63:0] aligned_readdata = readdata >> (offset * 8);
+logic [63:0] aligned_readdata;
+
+assign aligned_readdata = readdata >> (offset * 8);
 
 logic [63:0] memresult;
 
