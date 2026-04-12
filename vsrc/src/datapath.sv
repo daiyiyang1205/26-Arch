@@ -22,7 +22,9 @@ module datapath import common::*;(
     output logic [31:0] instrW,
     output logic regwriteW,
     output logic [4:0] writeRegW,
-    output logic [63:0] memresultW);
+    output logic [63:0] memresultW,
+    output logic memwriteW,
+    output logic [63:0] aluresultW);
 
 // pipeline control signal
 
@@ -51,7 +53,7 @@ logic immcat;
 
 logic alusrcD, alusrcE;
 
-logic [2:0] alucontrolD, alucontrolE;
+logic [3:0] alucontrolD, alucontrolE;
 
 logic upperregD, upperregE;
 
@@ -80,7 +82,7 @@ controller ctlr(clk, reset,
             memsizeD,
             memtoregD);
 
-stallreg #(13) cregDE(clk, reset, step, stall,
+stallreg #(14) cregDE(clk, reset, step, stall,
                 {regwriteD, alusrcD, alucontrolD, upperregD,
                 memreadD, memwriteD, signextendD, memsizeD, memtoregD},
                 {regwriteE, alusrcE, alucontrolE, upperregE,
@@ -92,9 +94,9 @@ enreg #(8) cregEM(clk, reset, step,
                 {regwriteM, memreadM, memwriteM, 
                 signextendM, memsizeM, memtoregM});
 
-enreg #(1) cregMW(clk, reset, step,
-                regwriteM,
-                regwriteW);
+enreg #(2) cregMW(clk, reset, step,
+                {regwriteM, memwriteM},
+                {regwriteW, memwriteW});
 
 // datapath
 
@@ -197,9 +199,9 @@ memory memory(clk, reset, step,
             dbus_req,
             memresultM);
 
-enreg #(165) dregMW(clk, reset, step,
-                {memresultM, writeRegM, pcM, instrM},
-                {memresultW, writeRegW, pcW, instrW});
+enreg #(229) dregMW(clk, reset, step,
+                {memresultM, writeRegM, pcM, instrM, aluresultM},
+                {memresultW, writeRegW, pcW, instrW, aluresultW});
 
 always_ff @(posedge clk) begin
     if (reset) begin

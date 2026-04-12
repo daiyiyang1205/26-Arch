@@ -13,7 +13,7 @@ module controller import common::*;(
     output logic regwriteD,
     output logic immcat,
     output logic alusrcD,
-    output logic [2:0] alucontrolD,
+    output logic [3:0] alucontrolD,
     output logic upperregD,
     output logic memreadD,
     output logic memwriteD,

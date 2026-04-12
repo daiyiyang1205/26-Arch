@@ -18,6 +18,8 @@ module core import common::*;(
 
 logic [63:0] next_reg[31:0];
 
+logic valid;
+
 logic [63:0] pc;
 
 logic [31:0] instr;
@@ -28,7 +30,9 @@ logic [4:0] writeReg;
 
 logic [63:0] memresult;
 
-logic valid;
+logic memwrite;
+
+logic [63:0] memaddr;
 
 datapath dp(clk, reset,
     		PCINIT,
@@ -42,7 +46,9 @@ datapath dp(clk, reset,
 			instr,
 			regwrite,
 			writeReg,
-			memresult);
+			memresult,
+			memwrite,
+			memaddr);
 
 `ifdef VERILATOR
 	DifftestInstrCommit DifftestInstrCommit(
@@ -52,7 +58,7 @@ datapath dp(clk, reset,
 		.valid              (valid),
 		.pc                 (pc),
 		.instr              (instr),
-		.skip               (0),
+		.skip               ((memwrite & memaddr[31] == 0)),
 		.isRVC              (0),
 		.scFailed           (0),
 		.wen                (regwrite),

@@ -10,7 +10,7 @@ module execute import common::*;(
     output logic execute_ok, // 表示当前模块是否已经准备好接受下一条指令了
     // 实际上 step = fetch_ok & decode_ok & execute_ok & memory_ok & writeback_ok; 也就是说，只有当五个阶段都准备好接受下一条指令了，step 才会为 1。
     input  logic alusrc,
-    input  logic [2:0] alucontrol,
+    input  logic [3:0] alucontrol,
     input  logic upperreg,
     input  logic [63:0] readData1,
     input  logic [63:0] readData2,
