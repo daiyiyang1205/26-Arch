@@ -3,6 +3,7 @@
 `include "src/controller.sv"
 `include "src/enreg.sv"
 `include "src/stallreg.sv"
+`include "src/comparer.sv"
 `include "src/fetch.sv"
 `include "src/decode.sv"
 `include "src/execute.sv"
@@ -49,13 +50,13 @@ assign stall = memreadE & (writeRegE != 0)
 
 logic regwriteD, regwriteE, regwriteM;
 
-logic immcat;
+logic [1:0] immsrc;
 
-logic alusrcD, alusrcE;
+logic [1:0] alusrcaD, alusrcaE;
+
+logic [1:0] alusrcbD, alusrcbE;
 
 logic [3:0] alucontrolD, alucontrolE;
-
-logic upperregD, upperregE;
 
 logic memreadD, memreadE, memreadM;
 
@@ -67,25 +68,31 @@ msize_t memsizeD, memsizeE, memsizeM;
 
 logic memtoregD, memtoregE, memtoregM;
 
+logic brch;
+
+logic [1:0] nextpcsrc;
+
 controller ctlr(clk, reset,
             instrD[6:0], 
             instrD[14:12], 
             instrD[31:25],
+            brch,
             regwriteD,
-            immcat,
-            alusrcD,
+            immsrc,
+            alusrcaD,
+            alusrcbD,
             alucontrolD,
-            upperregD,
             memreadD,
             memwriteD,
             signextendD,
             memsizeD,
-            memtoregD);
+            memtoregD,
+            nextpcsrc);
 
-stallreg #(14) cregDE(clk, reset, step, stall,
-                {regwriteD, alusrcD, alucontrolD, upperregD,
+stallreg #(16) cregDE(clk, reset, step, stall,
+                {regwriteD, alusrcaD, alusrcbD, alucontrolD,
                 memreadD, memwriteD, signextendD, memsizeD, memtoregD},
-                {regwriteE, alusrcE, alucontrolE, upperregE,
+                {regwriteE, alusrcaE, alusrcbE, alucontrolE,
                 memreadE, memwriteE, signextendE, memsizeE, memtoregE});
 
 enreg #(8) cregEM(clk, reset, step,
@@ -112,16 +119,22 @@ logic [4:0] writeRegD, writeRegE, writeRegM;
 
 logic [63:0] seimmD, seimmE;
 
-logic [63:0] seuimmD, seuimmE;
-
 logic [63:0] aluresultE, aluresultM;
 
 logic [63:0] memresultM;
 
+logic [63:0] seIimm, seBimm, seJimm;
+
+logic [63:0] pcbranch, pcjal, pcjalr;
+
 fetch fetch(clk, reset, step,
             fetch_ok,
+            nextpcsrc,
             stall,
             pcinit,
+            pcbranch,
+            pcjal,
+            pcjalr,
             ibus_resp,
             ibus_req,
             pcF, 
@@ -135,14 +148,16 @@ decode decode(clk, reset, step,
             decode_ok,
             instrD,
             regwriteW,
-            immcat,
+            immsrc,
             writeRegW,
             memresultW,
             readData1D,
             readData2D,
             writeRegD,
             seimmD,
-            seuimmD,
+            seIimm, 
+            seBimm, 
+            seJimm,
             next_reg);
 
 // forward
@@ -167,19 +182,31 @@ always_comb begin
     end
 end
 
-stallreg #(357) dregDE(clk, reset, step, stall,
-                {true_readData1D, true_readData2D, writeRegD, seimmD, seuimmD, pcD, instrD},
-                {readData1E, readData2E, writeRegE, seimmE, seuimmE, pcE, instrE});
+// branch & jal & jalr
+
+assign pcbranch = pcD + seBimm;
+
+assign pcjal = pcD + seJimm;
+
+assign pcjalr = (true_readData1D + seIimm) & (~1);
+
+// comparer
+
+comparer cmp(true_readData1D, true_readData2D, instrD[14:12], brch);
+
+stallreg #(293) dregDE(clk, reset, step, stall,
+                {true_readData1D, true_readData2D, writeRegD, seimmD, pcD, instrD},
+                {readData1E, readData2E, writeRegE, seimmE, pcE, instrE});
 
 execute execute(clk, reset, step,
                 execute_ok,
-                alusrcE,
+                alusrcaE,
+                alusrcbE,
                 alucontrolE,
-                upperregE,
                 readData1E,
                 readData2E,
                 seimmE,
-                seuimmE,
+                pcE,
                 aluresultE);
 
 enreg #(229) dregEM(clk, reset, step,

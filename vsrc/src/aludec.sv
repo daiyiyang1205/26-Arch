@@ -37,7 +37,7 @@ always_comb
             default: alucontrol = 4'b0000;
         endcase
 
-        7'b0011011: case (funct3)
+        7'b0011011: case (funct3) // I 32
             3'b000: alucontrol = 4'b0101;
 
             3'b001: alucontrol = 4'b1100;
@@ -46,7 +46,7 @@ always_comb
             default: alucontrol = 4'b0000;
         endcase
 
-        7'b0111011: case (funct3)
+        7'b0111011: case (funct3) // R 32
             3'b000: if (funct7[5] == 0) alucontrol = 4'b0101;
                     else alucontrol = 4'b0110;
             
@@ -60,7 +60,15 @@ always_comb
 
         7'b0100011: alucontrol = 4'b0000; // S Store
 
-        7'b0110111: alucontrol = 4'b0000; // U
+        7'b0110111: alucontrol = 4'b0000; // U lui
+
+        7'b1100011: alucontrol = 4'b0000; // B
+
+        7'b0010111: alucontrol = 4'b0000; // U auipc
+
+        7'b1101111: alucontrol = 4'b0000; // J jal
+
+        7'b1100111: alucontrol = 4'b0000; // I jalr
 
         default: alucontrol = 4'b0000;
     endcase

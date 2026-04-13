@@ -9,7 +9,7 @@ always_ff @(posedge clk, posedge reset)
     if (reset) q <= 0;
     else if (we) begin
         if (stall) q <= 0;
-        else q <= d ;
+        else q <= d;
     end
 
 endmodule

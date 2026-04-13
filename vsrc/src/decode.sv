@@ -1,6 +1,6 @@
 `ifdef VERILATOR
 `include "include/common.sv"
-`include "src/mux2.sv"
+`include "src/mux3.sv"
 `endif
 
 module decode import common::*;(
@@ -10,14 +10,16 @@ module decode import common::*;(
     // 实际上 step = fetch_ok & decode_ok & execute_ok & memory_ok & writeback_ok; 也就是说，只有当五个阶段都准备好接受下一条指令了，step 才会为 1。
     input  logic [31:0] instr,
     input  logic regwrite,
-    input  logic immcat,
+    input  logic [1:0] immsrc,
     input  logic [4:0] writeAddr3,
     input  logic [63:0] writeData3,
     output logic [63:0] readData1,
     output logic [63:0] readData2,
     output logic [4:0] writeRegD,
     output logic [63:0] seimm,
-    output logic [63:0] seuimm,
+    output logic [63:0] seIimm,
+    output logic [63:0] seBimm,
+    output logic [63:0] seJimm,
     output logic [63:0] next_reg[31:0]); // 输出寄存器
 
 logic [63:0] rf[31:0]; // 主寄存器
@@ -25,11 +27,15 @@ logic [63:0] rf[31:0]; // 主寄存器
 logic [4:0] readAddr1;
 logic [4:0] readAddr2;
 
-logic [11:0] dimm, aimm;
+logic [11:0] Iimm, Simm;
 
-logic [19:0] uimm;
+logic [19:0] Uimm;
 
-logic [63:0] sedimm, seaimm;
+logic [12:0] Bimm;
+
+logic [20:0] Jimm;
+
+logic [63:0] seSimm, seUimm;
 
 assign readAddr1 = instr[19:15];
 assign readAddr2 = instr[24:20];
@@ -38,16 +44,20 @@ assign readData1 = (readAddr1 == 0) ? 0 : next_reg[readAddr1];
 assign readData2 = (readAddr2 == 0) ? 0 : next_reg[readAddr2];
 assign writeRegD = instr[11:7];
 
-assign dimm = instr[31:20];
-assign aimm = {instr[31:25], instr[11:7]};
-assign uimm = instr[31:12];
+assign Iimm = instr[31:20];
+assign Simm = {instr[31:25], instr[11:7]};
+assign Uimm = instr[31:12];
+assign Bimm = {instr[31], instr[7], instr[30:25], instr[11:8], 1'b0};
+assign Jimm = {instr[31], instr[19:12], instr[20], instr[30:21], 1'b0};
 
-assign sedimm = {{52{dimm[11]}}, dimm};
-assign seaimm = {{52{aimm[11]}}, aimm};
+assign seIimm = {{52{Iimm[11]}}, Iimm};
+assign seSimm = {{52{Simm[11]}}, Simm};
+assign seUimm = {{32{Uimm[19]}}, Uimm, 12'b0};
 
-mux2 immmux(sedimm, seaimm, immcat, seimm);
+mux3 immmux(seIimm, seSimm, seUimm, immsrc, seimm);
 
-assign seuimm = {{32{uimm[19]}}, uimm, 12'b0};
+assign seBimm = {{51{Bimm[12]}}, Bimm};
+assign seJimm = {{43{Jimm[20]}}, Jimm};
 
 always_comb begin
 	for (int i = 0; i < 32; i++) begin

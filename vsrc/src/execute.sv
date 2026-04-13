@@ -1,6 +1,6 @@
 `ifdef VERILATOR
 `include "include/common.sv"
-`include "src/mux2.sv"
+`include "src/mux3.sv"
 `include "src/alu.sv"
 `endif
 
@@ -9,26 +9,22 @@ module execute import common::*;(
     input  logic step, // 这个信号用来同步整个 CPU 的时序，当其为 1 时，整个 CPU 流水线向前移动一个指令。
     output logic execute_ok, // 表示当前模块是否已经准备好接受下一条指令了
     // 实际上 step = fetch_ok & decode_ok & execute_ok & memory_ok & writeback_ok; 也就是说，只有当五个阶段都准备好接受下一条指令了，step 才会为 1。
-    input  logic alusrc,
+    input  logic [1:0] alusrca,
+    input  logic [1:0] alusrcb,
     input  logic [3:0] alucontrol,
-    input  logic upperreg,
     input  logic [63:0] readData1,
     input  logic [63:0] readData2,
     input  logic [63:0] seimm,
-    input  logic [63:0] seuimm,
-    output logic [63:0] result);
+    input  logic [63:0] pc,
+    output logic [63:0] aluresult);
 
 logic [63:0] srca, srcb;
 
-logic [63:0] aluresult;
+mux3 srcamux(readData1, 64'b0, pc, alusrca, srca);
 
-assign srca = readData1;
-
-mux2 srcbmux(readData2, seimm, alusrc, srcb);
+mux3 srcbmux(readData2, seimm, 4, alusrcb, srcb);
 
 alu alu(srca, srcb, alucontrol, aluresult);
-
-mux2 uppermux(aluresult, seuimm, upperreg, result);
 
 always_ff @(posedge clk) begin
     if (reset) begin

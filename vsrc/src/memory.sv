@@ -17,8 +17,7 @@ module memory import common::*;(
     input  logic [63:0] writedata,
 	input  dbus_resp_t dbus_resp,
     output dbus_req_t  dbus_req,
-    output logic [63:0] result
-    );
+    output logic [63:0] result);
 
 logic [2:0] offset;
 

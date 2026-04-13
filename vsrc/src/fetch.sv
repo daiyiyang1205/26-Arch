@@ -1,5 +1,6 @@
 `ifdef VERILATOR
 `include "include/common.sv"
+`include "src/mux4.sv"
 `endif
 
 module fetch import common::*;(
@@ -7,14 +8,20 @@ module fetch import common::*;(
     input  logic step, // 这个信号用来同步整个 CPU 的时序，当其为 1 时，整个 CPU 流水线向前移动一个指令。
     output logic fetch_ok, // 表示当前模块是否已经准备好接受下一条指令了
     // 实际上 step = fetch_ok & decode_ok & execute_ok & memory_ok & writeback_ok; 也就是说，只有当五个阶段都准备好接受下一条指令了，step 才会为 1。
+    input  logic [1:0] nextpcsrc,
     input  logic stall,
     input  logic [63:0] pcinit,
+    input  logic [63:0] pcbranch,
+    input  logic [63:0] pcjal,
+    input  logic [63:0] pcjalr,
     input  ibus_resp_t ibus_resp,
     output ibus_req_t ibus_req,
     output logic [63:0] nowpc,
     output logic [31:0] instr);
 
-logic [63:0] pc;
+logic [63:0] pc, nextpc;
+
+mux4 pcsrc(pc + 4, pcbranch, pcjal, pcjalr, nextpcsrc, nextpc);
 
 always_ff @(posedge clk) begin
     if (reset) begin
@@ -34,12 +41,18 @@ always_ff @(posedge clk) begin
             if (stall) begin
                 fetch_ok <= 1;
             end
+            else if (nextpcsrc != 0) begin
+                instr <= 32'b0;
+                fetch_ok <= 1;
+                ibus_req.valid <= 0;
+                pc <= nextpc;
+            end
             else begin
                 instr <= ibus_resp.data;
                 fetch_ok <= 1;
                 ibus_req.valid <= 0;
                 nowpc <= pc;
-                pc <= pc + 4;
+                pc <= nextpc;
             end
         end
     end
