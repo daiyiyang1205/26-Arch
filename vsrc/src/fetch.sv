@@ -8,6 +8,7 @@ module fetch import common::*;(
     input  logic step, // 这个信号用来同步整个 CPU 的时序，当其为 1 时，整个 CPU 流水线向前移动一个指令。
     output logic fetch_ok, // 表示当前模块是否已经准备好接受下一条指令了
     // 实际上 step = fetch_ok & decode_ok & execute_ok & memory_ok & writeback_ok; 也就是说，只有当五个阶段都准备好接受下一条指令了，step 才会为 1。
+    input  logic others_ok,
     input  logic [1:0] nextpcsrc,
     input  logic stall,
     input  logic [63:0] pcinit,
@@ -21,6 +22,8 @@ module fetch import common::*;(
 
 logic [63:0] pc, nextpc;
 
+logic [31:0] nextinstr;
+
 mux4 pcsrc(pc + 4, pcbranch, pcjal, pcjalr, nextpcsrc, nextpc);
 
 always_ff @(posedge clk) begin
@@ -30,29 +33,34 @@ always_ff @(posedge clk) begin
         ibus_req.valid <= 0;
         ibus_req.addr <= 0;
     end else if (step) begin
-        fetch_ok <= 0; // 先把 fetch_ok 置为 0，表示我们正在处理当前指令，还没有准备好接受下一条指令了。
-        ibus_req.valid <= 1; // 置为 1，表示我们要求取指令了。
-        ibus_req.addr <= pc; // 把我们要取指令的地址放在 addr 上。
+        fetch_ok <= 0;
+        ibus_req.valid <= 1;
+        ibus_req.addr <= pc;
     end else begin
-        // 这里对应：要么我们还没取好指令，要么我们取好指令了，在等其他模块
         if (fetch_ok) begin
             // 在等其他模块
-        end else if (ibus_resp.data_ok & ibus_resp.addr_ok) begin
+        end
+        else if (ibus_resp.data_ok & ibus_resp.addr_ok) begin // 指令取完了
+            nextinstr <= ibus_resp.data;
+            ibus_req.valid <= 0;
+        end
+        else if (ibus_req.valid == 0 && others_ok) begin // 指令取完了并且其他模块也完成了
+            // 情况1：阻塞
             if (stall) begin
                 fetch_ok <= 1;
             end
+            // 情况2：发生跳转
             else if (nextpcsrc != 0) begin
                 instr <= 32'b0;
-                fetch_ok <= 1;
-                ibus_req.valid <= 0;
                 pc <= nextpc;
-            end
-            else begin
-                instr <= ibus_resp.data;
                 fetch_ok <= 1;
-                ibus_req.valid <= 0;
+            end
+            // 情况3：取当前pc指向的指令
+            else begin
+                instr <= nextinstr;
                 nowpc <= pc;
                 pc <= nextpc;
+                fetch_ok <= 1;
             end
         end
     end

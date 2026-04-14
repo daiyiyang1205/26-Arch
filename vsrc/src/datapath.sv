@@ -24,14 +24,18 @@ module datapath import common::*;(
     output logic regwriteW,
     output logic [4:0] writeRegW,
     output logic [63:0] memresultW,
-    output logic memwriteW,
+    output logic mem,
     output logic [63:0] aluresultW);
 
 // pipeline control signal
 
 logic step, fetch_ok, decode_ok, execute_ok, memory_ok, writeback_ok;
 
+logic others_ok;
+
 assign step = fetch_ok & decode_ok & execute_ok & memory_ok & writeback_ok;
+
+assign others_ok = decode_ok & execute_ok & memory_ok & writeback_ok;
 
 // stall
 
@@ -58,9 +62,9 @@ logic [1:0] alusrcbD, alusrcbE;
 
 logic [3:0] alucontrolD, alucontrolE;
 
-logic memreadD, memreadE, memreadM;
+logic memreadD, memreadE, memreadM, memreadW;
 
-logic memwriteD, memwriteE, memwriteM;
+logic memwriteD, memwriteE, memwriteM, memwriteW;
 
 logic signextendD, signextendE, signextendM;
 
@@ -101,9 +105,11 @@ enreg #(8) cregEM(clk, reset, step,
                 {regwriteM, memreadM, memwriteM, 
                 signextendM, memsizeM, memtoregM});
 
-enreg #(2) cregMW(clk, reset, step,
-                {regwriteM, memwriteM},
-                {regwriteW, memwriteW});
+enreg #(3) cregMW(clk, reset, step,
+                {regwriteM, memreadM, memwriteM},
+                {regwriteW, memreadW, memwriteW});
+
+assign mem = memreadW | memwriteW;
 
 // datapath
 
@@ -129,6 +135,7 @@ logic [63:0] pcbranch, pcjal, pcjalr;
 
 fetch fetch(clk, reset, step,
             fetch_ok,
+            others_ok,
             nextpcsrc,
             stall,
             pcinit,

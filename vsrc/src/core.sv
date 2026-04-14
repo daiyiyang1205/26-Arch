@@ -30,7 +30,7 @@ logic [4:0] writeReg;
 
 logic [63:0] memresult;
 
-logic memwrite;
+logic mem;
 
 logic [63:0] memaddr;
 
@@ -47,7 +47,7 @@ datapath dp(clk, reset,
 			regwrite,
 			writeReg,
 			memresult,
-			memwrite,
+			mem,
 			memaddr);
 
 `ifdef VERILATOR
@@ -58,7 +58,7 @@ datapath dp(clk, reset,
 		.valid              (valid),
 		.pc                 (pc),
 		.instr              (instr),
-		.skip               ((memwrite & memaddr[31] == 0)),
+		.skip               ((mem & memaddr[31] == 0)),
 		.isRVC              (0),
 		.scFailed           (0),
 		.wen                (regwrite),
