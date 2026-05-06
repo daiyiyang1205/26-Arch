@@ -70,6 +70,18 @@ always_comb
 
         7'b1100111: alucontrol = 4'b0000; // I jalr
 
+        7'b1110011: case (funct3) // I CSR
+            3'b001: alucontrol = 4'b0000;
+            3'b010: alucontrol = 4'b0011;
+            3'b011: alucontrol = 4'b0010;
+
+            3'b101: alucontrol = 4'b0000;
+            3'b110: alucontrol = 4'b0011;
+            3'b111: alucontrol = 4'b0010;
+
+            default: alucontrol = 4'b0000;
+        endcase
+
         default: alucontrol = 4'b0000;
     endcase
 

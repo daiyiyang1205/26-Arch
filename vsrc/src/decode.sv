@@ -1,18 +1,24 @@
 `ifdef VERILATOR
 `include "include/common.sv"
+`include "include/csr.sv"
+`include "src/mux2.sv"
 `include "src/mux3.sv"
 `endif
 
-module decode import common::*;(
+module decode import common::*, csr_pkg::*;(
     input  logic clk, reset,
     input  logic step, // 这个信号用来同步整个 CPU 的时序，当其为 1 时，整个 CPU 流水线向前移动一个指令。
     output logic decode_ok, // 表示当前模块是否已经准备好接受下一条指令了
     // 实际上 step = fetch_ok & decode_ok & execute_ok & memory_ok & writeback_ok; 也就是说，只有当五个阶段都准备好接受下一条指令了，step 才会为 1。
     input  logic [31:0] instr,
     input  logic regwrite,
+    input  logic csrwrite,
+    input  logic regwritecsr,
     input  logic [1:0] immsrc,
     input  logic [4:0] writeAddr3,
-    input  logic [63:0] writeData3,
+    input  logic [11:0] writecsrW,
+    input  logic [63:0] memresult,
+    input  logic [63:0] csrresult,
     output logic [63:0] readData1,
     output logic [63:0] readData2,
     output logic [4:0] writeRegD,
@@ -20,7 +26,12 @@ module decode import common::*;(
     output logic [63:0] seIimm,
     output logic [63:0] seBimm,
     output logic [63:0] seJimm,
-    output logic [63:0] next_reg[31:0]); // 输出寄存器
+    output logic [63:0] next_reg[31:0],
+    output logic [63:0] readcsrData,
+    output logic [11:0] writecsrD,
+    output logic [63:0] zeimm,
+    output logic [63:0] next_mstatus, next_mepc, next_mtval, next_mtvec, 
+             next_mcause, next_satp, next_mip, next_mie, next_mscratch); // 输出寄存器
 
 logic [63:0] rf[31:0]; // 主寄存器
 
@@ -36,6 +47,19 @@ logic [12:0] Bimm;
 logic [20:0] Jimm;
 
 logic [63:0] seSimm, seUimm;
+
+logic [63:0] writeData3;
+
+// csr
+
+logic [63:0] mstatus, mepc, mtval, mtvec,
+             mcause, satp, mip, mie, mscratch, mcycle;
+
+logic [63:0] next_mcycle;
+
+logic [11:0] readcsrid;
+
+logic [4:0] zimm;
 
 assign readAddr1 = instr[19:15];
 assign readAddr2 = instr[24:20];
@@ -59,6 +83,34 @@ mux3 immmux(seIimm, seSimm, seUimm, immsrc, seimm);
 assign seBimm = {{51{Bimm[12]}}, Bimm};
 assign seJimm = {{43{Jimm[20]}}, Jimm};
 
+// csr
+
+assign readcsrid = instr[31:20];
+
+always_comb begin
+    case (readcsrid)
+        CSR_MIE: readcsrData = next_mie;
+        CSR_MIP: readcsrData = next_mip;
+        CSR_MTVEC: readcsrData = next_mtvec;
+        CSR_MSTATUS: readcsrData = next_mstatus;
+        CSR_MSCRATCH: readcsrData = next_mscratch;
+        CSR_MEPC: readcsrData = next_mepc;
+        CSR_SATP: readcsrData = next_satp;
+        CSR_MCAUSE: readcsrData = next_mcause;
+        CSR_MCYCLE: readcsrData = next_mcycle;
+        CSR_MTVAL: readcsrData = next_mtval;
+        default: readcsrData = 0;
+    endcase
+end
+
+assign zimm = instr[19:15];
+
+assign zeimm = {59'b0, zimm};
+
+assign writecsrD = instr[31:20];
+
+mux2 regwritemux(memresult, csrresult, regwritecsr, writeData3); 
+
 always_comb begin
 	for (int i = 0; i < 32; i++) begin
 		if (regwrite && (i != 0) && (i[4:0] == writeAddr3)) begin
@@ -69,13 +121,65 @@ always_comb begin
 	end
 end
 
+// csr
+
+always_comb begin
+    if (csrwrite && (writecsrW == CSR_MIE)) next_mie = memresult;
+    else next_mie = mie;
+    
+    if (csrwrite && (writecsrW == CSR_MIP)) next_mip = memresult & MIP_MASK;
+    else next_mip = mip;
+
+    if (csrwrite && (writecsrW == CSR_MTVEC)) next_mtvec = memresult & MTVEC_MASK;
+    else next_mtvec = mtvec;
+
+    if (csrwrite && (writecsrW == CSR_MSTATUS)) next_mstatus = memresult & MSTATUS_MASK;
+    else next_mstatus = mstatus;
+       
+    if (csrwrite && (writecsrW == CSR_MSCRATCH)) next_mscratch = memresult;
+    else next_mscratch = mscratch;
+
+    if (csrwrite && (writecsrW == CSR_MEPC)) next_mepc = memresult;
+    else next_mepc = mepc;
+
+    if (csrwrite && (writecsrW == CSR_SATP)) next_satp = memresult;
+    else next_satp = satp;
+    
+    if (csrwrite && (writecsrW == CSR_MCAUSE)) next_mcause = memresult;
+    else next_mcause = mcause;
+
+    if (csrwrite && (writecsrW == CSR_MCYCLE)) next_mcycle = memresult;
+    else next_mcycle = mcycle;
+
+    if (csrwrite && (writecsrW == CSR_MTVAL)) next_mtval = memresult;
+    else next_mtval = mtval;
+	
+end
+
 always_ff @(posedge clk) begin
     if (reset) begin
         decode_ok <= 1;
     end else if (step) begin
         decode_ok <= 0; // 先把 decode_ok 置为 0，表示我们正在处理当前指令，还没有准备好接受下一条指令了。
         if (regwrite && writeAddr3 != 0) rf[writeAddr3] <= writeData3;
+        if (csrwrite) begin
+            case (writecsrW)
+                CSR_MIE: mie <= memresult;
+                CSR_MIP: mip <= memresult & MIP_MASK;
+                CSR_MTVEC: mtvec <= memresult & MTVEC_MASK;
+                CSR_MSTATUS: mstatus <= memresult & MSTATUS_MASK;
+                CSR_MSCRATCH: mscratch <= memresult;
+                CSR_MEPC: mepc <= memresult;
+                CSR_SATP: satp <= memresult;
+                CSR_MCAUSE: mcause <= memresult;
+                CSR_MCYCLE: mcycle <= memresult;
+                CSR_MTVAL: mtval <= memresult;
+                default: mcycle <= mcycle + 1;
+            endcase
+        end
+        else mcycle <= mcycle + 1;
     end else begin
+        mcycle <= mcycle + 1;
         // 这里对应：要么我们还没译码好指令，要么我们译码好指令了，在等其他模块
         if (decode_ok) begin
             // 在等其他模块

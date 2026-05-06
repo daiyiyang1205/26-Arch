@@ -25,7 +25,9 @@ module datapath import common::*;(
     output logic [4:0] writeRegW,
     output logic [63:0] memresultW,
     output logic mem,
-    output logic [63:0] aluresultW);
+    output logic [63:0] aluresultW,
+    output logic [63:0] next_mstatus, next_mepc, next_mtval, next_mtvec, 
+                    next_mcause, next_satp, next_mip, next_mie, next_mscratch);
 
 // pipeline control signal
 
@@ -54,7 +56,15 @@ assign stall = memreadE & (writeRegE != 0)
 
 logic regwriteD, regwriteE, regwriteM;
 
+logic csrwriteD, csrwriteE, csrwriteM, csrwriteW;
+
+logic regwritecsrD, regwritecsrE, regwritecsrM, regwritecsrW;
+
 logic [1:0] immsrc;
+
+logic csrimmD, csrimmE;
+
+logic oldcsrD, oldcsrE;
 
 logic [1:0] alusrcaD, alusrcaE;
 
@@ -82,7 +92,11 @@ controller ctlr(clk, reset,
             instrD[31:25],
             brch,
             regwriteD,
+            csrwriteD,
+            regwritecsrD,
             immsrc,
+            csrimmD,
+            oldcsrD,
             alusrcaD,
             alusrcbD,
             alucontrolD,
@@ -93,21 +107,23 @@ controller ctlr(clk, reset,
             memtoregD,
             nextpcsrc);
 
-stallreg #(16) cregDE(clk, reset, step, stall,
-                {regwriteD, alusrcaD, alusrcbD, alucontrolD,
+stallreg #(20) cregDE(clk, reset, step, stall,
+                {regwriteD, csrwriteD, regwritecsrD, 
+                csrimmD, oldcsrD, alusrcaD, alusrcbD, alucontrolD,
                 memreadD, memwriteD, signextendD, memsizeD, memtoregD},
-                {regwriteE, alusrcaE, alusrcbE, alucontrolE,
+                {regwriteE, csrwriteE, regwritecsrE, 
+                csrimmE, oldcsrE, alusrcaE, alusrcbE, alucontrolE,
                 memreadE, memwriteE, signextendE, memsizeE, memtoregE});
 
-enreg #(8) cregEM(clk, reset, step,
-                {regwriteE, memreadE, memwriteE, 
-                signextendE, memsizeE, memtoregE}, 
-                {regwriteM, memreadM, memwriteM, 
-                signextendM, memsizeM, memtoregM});
+enreg #(10) cregEM(clk, reset, step,
+                {regwriteE, csrwriteE, regwritecsrE, 
+                memreadE, memwriteE, signextendE, memsizeE, memtoregE}, 
+                {regwriteM, csrwriteM, regwritecsrM, 
+                memreadM, memwriteM, signextendM, memsizeM, memtoregM});
 
-enreg #(3) cregMW(clk, reset, step,
-                {regwriteM, memreadM, memwriteM},
-                {regwriteW, memreadW, memwriteW});
+enreg #(5) cregMW(clk, reset, step,
+                {regwriteM, csrwriteM, regwritecsrM, memreadM, memwriteM},
+                {regwriteW, csrwriteW, regwritecsrW, memreadW, memwriteW});
 
 assign mem = memreadW | memwriteW;
 
@@ -123,13 +139,19 @@ logic [63:0] readData2D, readData2E, readData2M;
 
 logic [4:0] writeRegD, writeRegE, writeRegM;
 
+logic [11:0] writecsrD, writecsrE, writecsrM, writecsrW;
+
 logic [63:0] seimmD, seimmE;
 
 logic [63:0] aluresultE, aluresultM;
 
 logic [63:0] memresultM;
 
+logic [63:0] csrresultD, csrresultE, csrresultM, csrresultW;
+
 logic [63:0] seIimm, seBimm, seJimm;
+
+logic [63:0] zeimmD, zeimmE;
 
 logic [63:0] pcbranch, pcjal, pcjalr;
 
@@ -155,9 +177,13 @@ decode decode(clk, reset, step,
             decode_ok,
             instrD,
             regwriteW,
+            csrwriteW,
+            regwritecsrW,
             immsrc,
             writeRegW,
+            writecsrW,
             memresultW,
+            csrresultW,
             readData1D,
             readData2D,
             writeRegD,
@@ -165,7 +191,12 @@ decode decode(clk, reset, step,
             seIimm, 
             seBimm, 
             seJimm,
-            next_reg);
+            next_reg,
+            csrresultD,
+            writecsrD,
+            zeimmD,
+            next_mstatus, next_mepc, next_mtval, next_mtvec, 
+            next_mcause, next_satp, next_mip, next_mie, next_mscratch);
 
 // forward
 
@@ -201,12 +232,18 @@ assign pcjalr = (true_readData1D + seIimm) & (~1);
 
 comparer cmp(true_readData1D, true_readData2D, instrD[14:12], brch);
 
-stallreg #(293) dregDE(clk, reset, step, stall,
-                {true_readData1D, true_readData2D, writeRegD, seimmD, pcD, instrD},
-                {readData1E, readData2E, writeRegE, seimmE, pcE, instrE});
+stallreg #(433) dregDE(clk, reset, step, stall,
+                {true_readData1D, true_readData2D, writeRegD, seimmD,
+                csrresultD, writecsrD, zeimmD,
+                pcD, instrD},
+                {readData1E, readData2E, writeRegE, seimmE,
+                csrresultE, writecsrE, zeimmE,
+                pcE, instrE});
 
 execute execute(clk, reset, step,
                 execute_ok,
+                csrimmE,
+                oldcsrE,
                 alusrcaE,
                 alusrcbE,
                 alucontrolE,
@@ -214,11 +251,17 @@ execute execute(clk, reset, step,
                 readData2E,
                 seimmE,
                 pcE,
+                zeimmE,
+                csrresultE,
                 aluresultE);
 
-enreg #(229) dregEM(clk, reset, step,
-                {aluresultE, readData2E, writeRegE, pcE, instrE},
-                {aluresultM, readData2M, writeRegM, pcM, instrM});
+enreg #(305) dregEM(clk, reset, step,
+                {aluresultE, readData2E, writeRegE,
+                csrresultE, writecsrE,
+                pcE, instrE},
+                {aluresultM, readData2M, writeRegM,
+                csrresultM, writecsrM,
+                pcM, instrM});
 
 memory memory(clk, reset, step,
             memory_ok,
@@ -233,9 +276,13 @@ memory memory(clk, reset, step,
             dbus_req,
             memresultM);
 
-enreg #(229) dregMW(clk, reset, step,
-                {memresultM, writeRegM, pcM, instrM, aluresultM},
-                {memresultW, writeRegW, pcW, instrW, aluresultW});
+enreg #(305) dregMW(clk, reset, step,
+                {memresultM, writeRegM,
+                csrresultM, writecsrM, 
+                pcM, instrM, aluresultM},
+                {memresultW, writeRegW, 
+                csrresultW, writecsrW,
+                pcW, instrW, aluresultW});
 
 always_ff @(posedge clk) begin
     if (reset) begin

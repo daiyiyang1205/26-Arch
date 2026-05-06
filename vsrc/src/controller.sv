@@ -12,7 +12,11 @@ module controller import common::*;(
     input  logic [6:0] funct7,
     input  logic brch,
     output logic regwriteD,
+    output logic csrwriteD,
+    output logic regwritecsrD,
     output logic [1:0] immsrc,
+    output logic csrimmD,
+    output logic oldcsrD,
     output logic [1:0] alusrcaD,
     output logic [1:0] alusrcbD,
     output logic [3:0] alucontrolD,
@@ -23,7 +27,10 @@ module controller import common::*;(
     output logic memtoregD,
     output logic [1:0] nextpcsrc);
 
-maindec md(op, brch, regwriteD, immsrc, alusrcaD, alusrcbD, 
+maindec md(op, funct3, brch,
+            regwriteD, csrwriteD, regwritecsrD,
+            immsrc,
+            csrimmD, oldcsrD, alusrcaD, alusrcbD, 
             memreadD, memwriteD, memtoregD,
             nextpcsrc);
 

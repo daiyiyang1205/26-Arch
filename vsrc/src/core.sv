@@ -3,10 +3,11 @@
 
 `ifdef VERILATOR
 `include "include/common.sv"
+`include "include/csr.sv"
 `include "src/datapath.sv"
 `endif
 
-module core import common::*;(
+module core import common::*, csr_pkg::*;(
 	input  logic       clk, reset,
 	output ibus_req_t  ireq,
 	input  ibus_resp_t iresp,
@@ -34,6 +35,13 @@ logic mem;
 
 logic [63:0] memaddr;
 
+logic [63:0] mhartid;
+
+assign mhartid = 0;
+
+logic [63:0] next_mstatus, next_mepc, next_mtval, next_mtvec, 
+             next_mcause, next_satp, next_mip, next_mie, next_mscratch;
+
 datapath dp(clk, reset,
     		PCINIT,
     		iresp,
@@ -48,12 +56,14 @@ datapath dp(clk, reset,
 			writeReg,
 			memresult,
 			mem,
-			memaddr);
+			memaddr,
+			next_mstatus, next_mepc, next_mtval, next_mtvec, 
+            next_mcause, next_satp, next_mip, next_mie, next_mscratch);
 
 `ifdef VERILATOR
 	DifftestInstrCommit DifftestInstrCommit(
 		.clock              (clk),
-		.coreid             (0),
+		.coreid             (mhartid[7:0]),
 		.index              (0),
 		.valid              (valid),
 		.pc                 (pc),
@@ -68,7 +78,7 @@ datapath dp(clk, reset,
 
 	DifftestArchIntRegState DifftestArchIntRegState (
 		.clock              (clk),
-		.coreid             (0),
+		.coreid             (mhartid[7:0]),
 		.gpr_0              (next_reg[0]),
 		.gpr_1              (next_reg[1]),
 		.gpr_2              (next_reg[2]),
@@ -105,7 +115,7 @@ datapath dp(clk, reset,
 
     DifftestTrapEvent DifftestTrapEvent(
 		.clock              (clk),
-		.coreid             (0),
+		.coreid             (mhartid[7:0]),
 		.valid              (0),
 		.code               (0),
 		.pc                 (0),
@@ -115,22 +125,22 @@ datapath dp(clk, reset,
 
 	DifftestCSRState DifftestCSRState(
 		.clock              (clk),
-		.coreid             (0),
+		.coreid             (mhartid[7:0]),
 		.priviledgeMode     (3),
-		.mstatus            (0),
-		.sstatus            (0 /* mstatus & SSTATUS_MASK */),
-		.mepc               (0),
+		.mstatus            (next_mstatus),
+		.sstatus            (next_mstatus & SSTATUS_MASK),
+		.mepc               (next_mepc),
 		.sepc               (0),
-		.mtval              (0),
+		.mtval              (next_mtval),
 		.stval              (0),
-		.mtvec              (0),
+		.mtvec              (next_mtvec),
 		.stvec              (0),
-		.mcause             (0),
+		.mcause             (next_mcause),
 		.scause             (0),
-		.satp               (0),
-		.mip                (0),
-		.mie                (0),
-		.mscratch           (0),
+		.satp               (next_satp),
+		.mip                (next_mip),
+		.mie                (next_mie),
+		.mscratch           (next_mscratch),
 		.sscratch           (0),
 		.mideleg            (0),
 		.medeleg            (0)
