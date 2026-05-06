@@ -11,6 +11,7 @@ module fetch import common::*;(
     input  logic others_ok,
     input  logic [1:0] nextpcsrc,
     input  logic stall,
+    input  logic [1:0] csrstall,
     input  logic [63:0] pcinit,
     input  logic [63:0] pcbranch,
     input  logic [63:0] pcjal,
@@ -45,17 +46,22 @@ always_ff @(posedge clk) begin
             ibus_req.valid <= 0;
         end
         else if (ibus_req.valid == 0 && others_ok) begin // 指令取完了并且其他模块也完成了
-            // 情况1：阻塞
+            // 情况1：load-use阻塞
             if (stall) begin
                 fetch_ok <= 1;
             end
-            // 情况2：发生跳转
+            // 情况2：csr阻塞
+            else if (csrstall >= 1) begin
+                instr <= 32'b0;
+                fetch_ok <= 1;
+            end
+            // 情况3：发生跳转
             else if (nextpcsrc != 0) begin
                 instr <= 32'b0;
                 pc <= nextpc;
                 fetch_ok <= 1;
             end
-            // 情况3：取当前pc指向的指令
+            // 情况4：取当前pc指向的指令
             else begin
                 instr <= nextinstr;
                 nowpc <= pc;

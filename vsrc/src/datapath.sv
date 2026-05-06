@@ -39,7 +39,7 @@ assign step = fetch_ok & decode_ok & execute_ok & memory_ok & writeback_ok;
 
 assign others_ok = decode_ok & execute_ok & memory_ok & writeback_ok;
 
-// stall
+// load-use stall
 
 logic stall;
 
@@ -51,6 +51,21 @@ assign readAddr2 = instrD[24:20];
 
 assign stall = memreadE & (writeRegE != 0) 
                 & ((writeRegE == readAddr1) || (writeRegE == readAddr2)); 
+
+// csr stall
+
+logic [1:0] stallcnt;
+
+always_ff @(posedge clk) begin
+    if (reset) begin
+        stallcnt <= 0;
+    end else if (step) begin
+        if (instrF[6:0] == 7'b1110011) begin
+            stallcnt <= 2;
+        end
+        else if (stallcnt >= 1) stallcnt <= stallcnt - 1;
+    end
+end
 
 // controller
 
@@ -160,6 +175,7 @@ fetch fetch(clk, reset, step,
             others_ok,
             nextpcsrc,
             stall,
+            stallcnt,
             pcinit,
             pcbranch,
             pcjal,
