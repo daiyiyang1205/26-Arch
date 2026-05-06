@@ -31,7 +31,9 @@ module decode import common::*, csr_pkg::*;(
     output logic [11:0] writecsrD,
     output logic [63:0] zeimm,
     output logic [63:0] next_mstatus, next_mepc, next_mtval, next_mtvec, 
-             next_mcause, next_satp, next_mip, next_mie, next_mscratch); // 输出寄存器
+                next_mcause, next_satp, next_mip, next_mie, next_mscratch,
+    output logic [63:0] next_sie, next_sip, next_sepc, next_stval, next_stvec,
+			    next_scause, next_sscratch, next_mideleg, next_medeleg); // 输出寄存器
 
 logic [63:0] rf[31:0]; // 主寄存器
 
@@ -53,13 +55,16 @@ logic [63:0] writeData3;
 // csr
 
 logic [63:0] mstatus, mepc, mtval, mtvec,
-             mcause, satp, mip, mie, mscratch, mcycle;
+            mcause, satp, mip, mie, mscratch, mcycle;
 
 logic [63:0] next_mcycle;
 
-logic [11:0] readcsrid;
+logic [11:0] readcsr;
 
 logic [4:0] zimm;
+
+logic [63:0] sie, sip, sepc, stval, stvec,
+			scause, sscratch, mideleg, medeleg;
 
 assign readAddr1 = instr[19:15];
 assign readAddr2 = instr[24:20];
@@ -85,21 +90,31 @@ assign seJimm = {{43{Jimm[20]}}, Jimm};
 
 // csr
 
-assign readcsrid = instr[31:20];
+assign readcsr = instr[31:20];
 
 always_comb begin
-    case (readcsrid)
-        CSR_MIE: readcsrData = next_mie;
-        CSR_MIP: readcsrData = next_mip;
-        CSR_MTVEC: readcsrData = next_mtvec;
-        CSR_MSTATUS: readcsrData = next_mstatus;
+    case (readcsr)
+        CSR_MIE:      readcsrData = next_mie;
+        CSR_MIP:      readcsrData = next_mip;
+        CSR_MTVEC:    readcsrData = next_mtvec;
+        CSR_MSTATUS:  readcsrData = next_mstatus;
         CSR_MSCRATCH: readcsrData = next_mscratch;
-        CSR_MEPC: readcsrData = next_mepc;
-        CSR_SATP: readcsrData = next_satp;
-        CSR_MCAUSE: readcsrData = next_mcause;
-        CSR_MCYCLE: readcsrData = next_mcycle;
-        CSR_MTVAL: readcsrData = next_mtval;
-        default: readcsrData = 0;
+        CSR_MEPC:     readcsrData = next_mepc;
+        CSR_SATP:     readcsrData = next_satp;
+        CSR_MCAUSE:   readcsrData = next_mcause;
+        CSR_MCYCLE:   readcsrData = next_mcycle;
+        CSR_MTVAL:    readcsrData = next_mtval;
+
+        CSR_MEDELEG:  readcsrData = next_medeleg;
+        CSR_MIDELEG:  readcsrData = next_mideleg;
+        CSR_STVEC:    readcsrData = next_stvec;
+        CSR_SSCRATCH: readcsrData = next_sscratch;
+        CSR_SEPC:     readcsrData = next_sepc;
+        CSR_SCAUSE:   readcsrData = next_scause;
+        CSR_STVAL:    readcsrData = next_stval;
+        CSR_SIE:      readcsrData = next_sie;
+        CSR_SIP:      readcsrData = next_sip;
+        default:      readcsrData = 0;
     endcase
 end
 
@@ -124,36 +139,50 @@ end
 // csr
 
 always_comb begin
-    if (csrwrite && (writecsrW == CSR_MIE)) next_mie = memresult;
-    else next_mie = mie;
-    
-    if (csrwrite && (writecsrW == CSR_MIP)) next_mip = memresult & MIP_MASK;
-    else next_mip = mip;
+    next_mie      = mie;
+    next_mip      = mip;
+    next_mtvec    = mtvec;
+    next_mstatus  = mstatus;
+    next_mscratch = mscratch;
+    next_mepc     = mepc;
+    next_mcause   = mcause;
+    next_mtval    = mtval;
+    next_mcycle   = mcycle;
+    next_stvec    = stvec;
+    next_sscratch = sscratch;
+    next_sepc     = sepc;
+    next_scause   = scause;
+    next_stval    = stval;
+    next_sie      = sie;
+    next_sip      = sip;
+    next_mideleg  = mideleg;
+    next_medeleg  = medeleg;
+    next_satp     = satp;
 
-    if (csrwrite && (writecsrW == CSR_MTVEC)) next_mtvec = memresult & MTVEC_MASK;
-    else next_mtvec = mtvec;
-
-    if (csrwrite && (writecsrW == CSR_MSTATUS)) next_mstatus = memresult & MSTATUS_MASK;
-    else next_mstatus = mstatus;
-       
-    if (csrwrite && (writecsrW == CSR_MSCRATCH)) next_mscratch = memresult;
-    else next_mscratch = mscratch;
-
-    if (csrwrite && (writecsrW == CSR_MEPC)) next_mepc = memresult;
-    else next_mepc = mepc;
-
-    if (csrwrite && (writecsrW == CSR_SATP)) next_satp = memresult;
-    else next_satp = satp;
-    
-    if (csrwrite && (writecsrW == CSR_MCAUSE)) next_mcause = memresult;
-    else next_mcause = mcause;
-
-    if (csrwrite && (writecsrW == CSR_MCYCLE)) next_mcycle = memresult;
-    else next_mcycle = mcycle;
-
-    if (csrwrite && (writecsrW == CSR_MTVAL)) next_mtval = memresult;
-    else next_mtval = mtval;
-	
+    if (csrwrite) begin
+        case (writecsrW)
+            CSR_MIE:      next_mie      = memresult;
+            CSR_MIP:      next_mip      = memresult & MIP_MASK;
+            CSR_MTVEC:    next_mtvec    = memresult & MTVEC_MASK;
+            CSR_MSTATUS:  next_mstatus  = memresult & MSTATUS_MASK;
+            CSR_MSCRATCH: next_mscratch = memresult;
+            CSR_MEPC:     next_mepc     = memresult;
+            CSR_MCAUSE:   next_mcause   = memresult;
+            CSR_MTVAL:    next_mtval    = memresult;
+            CSR_MCYCLE:   next_mcycle   = memresult;
+            CSR_STVEC:    next_stvec    = memresult;
+            CSR_SSCRATCH: next_sscratch = memresult;
+            CSR_SEPC:     next_sepc     = memresult;
+            CSR_SCAUSE:   next_scause   = memresult;
+            CSR_STVAL:    next_stval    = memresult;
+            CSR_SIE:      next_sie      = memresult;
+            CSR_SIP:      next_sip      = memresult;
+            CSR_MIDELEG:  next_mideleg  = memresult & MIDELEG_MASK;
+            CSR_MEDELEG:  next_medeleg  = memresult & MEDELEG_MASK;
+            CSR_SATP:     next_satp     = memresult;
+            default: ;
+        endcase
+    end
 end
 
 always_ff @(posedge clk) begin
@@ -164,17 +193,29 @@ always_ff @(posedge clk) begin
         if (regwrite && writeAddr3 != 0) rf[writeAddr3] <= writeData3;
         if (csrwrite) begin
             case (writecsrW)
-                CSR_MIE: mie <= memresult;
-                CSR_MIP: mip <= memresult & MIP_MASK;
-                CSR_MTVEC: mtvec <= memresult & MTVEC_MASK;
-                CSR_MSTATUS: mstatus <= memresult & MSTATUS_MASK;
-                CSR_MSCRATCH: mscratch <= memresult;
-                CSR_MEPC: mepc <= memresult;
-                CSR_SATP: satp <= memresult;
-                CSR_MCAUSE: mcause <= memresult;
-                CSR_MCYCLE: mcycle <= memresult;
-                CSR_MTVAL: mtval <= memresult;
-                default: mcycle <= mcycle + 1;
+                CSR_MIE:        mie      <= memresult;
+                CSR_MIP:        mip      <= memresult & MIP_MASK;
+                CSR_MTVEC:      mtvec    <= memresult & MTVEC_MASK;
+                CSR_MSTATUS:    mstatus  <= memresult & MSTATUS_MASK;
+                CSR_MSCRATCH:   mscratch <= memresult;
+                CSR_MEPC:       mepc     <= memresult;
+                CSR_SATP:       satp     <= memresult;
+                CSR_MCAUSE:     mcause   <= memresult;
+                CSR_MCYCLE:     mcycle   <= memresult;
+                CSR_MTVAL:      mtval    <= memresult;
+
+                CSR_STVEC:      stvec    <= memresult;
+                CSR_SSCRATCH:   sscratch <= memresult;
+                CSR_SEPC:       sepc     <= memresult;
+                CSR_SCAUSE:     scause   <= memresult;
+                CSR_STVAL:      stval    <= memresult;
+                CSR_SIE:        sie      <= memresult;
+                CSR_SIP:        sip      <= memresult;
+
+                CSR_MIDELEG:    mideleg  <= memresult & MIDELEG_MASK;
+                CSR_MEDELEG:    medeleg  <= memresult & MEDELEG_MASK;
+
+                default:        mcycle   <= mcycle + 1;
             endcase
         end
         else mcycle <= mcycle + 1;

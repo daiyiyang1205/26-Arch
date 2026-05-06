@@ -40,7 +40,10 @@ logic [63:0] mhartid;
 assign mhartid = 0;
 
 logic [63:0] next_mstatus, next_mepc, next_mtval, next_mtvec, 
-             next_mcause, next_satp, next_mip, next_mie, next_mscratch;
+            next_mcause, next_satp, next_mip, next_mie, next_mscratch;
+
+logic [63:0] next_sie, next_sip, next_sepc, next_stval, next_stvec,
+			next_scause, next_sscratch, next_mideleg, next_medeleg;
 
 datapath dp(clk, reset,
     		PCINIT,
@@ -58,7 +61,9 @@ datapath dp(clk, reset,
 			mem,
 			memaddr,
 			next_mstatus, next_mepc, next_mtval, next_mtvec, 
-            next_mcause, next_satp, next_mip, next_mie, next_mscratch);
+            next_mcause, next_satp, next_mip, next_mie, next_mscratch,
+			next_sie, next_sip, next_sepc, next_stval, next_stvec,
+			next_scause, next_sscratch, next_mideleg, next_medeleg);
 
 `ifdef VERILATOR
 	DifftestInstrCommit DifftestInstrCommit(
@@ -130,20 +135,20 @@ datapath dp(clk, reset,
 		.mstatus            (next_mstatus),
 		.sstatus            (next_mstatus & SSTATUS_MASK),
 		.mepc               (next_mepc),
-		.sepc               (0),
+		.sepc               (next_sepc),
 		.mtval              (next_mtval),
-		.stval              (0),
+		.stval              (next_stval),
 		.mtvec              (next_mtvec),
-		.stvec              (0),
+		.stvec              (next_stvec),
 		.mcause             (next_mcause),
-		.scause             (0),
+		.scause             (next_scause),
 		.satp               (next_satp),
 		.mip                (next_mip),
 		.mie                (next_mie),
 		.mscratch           (next_mscratch),
-		.sscratch           (0),
-		.mideleg            (0),
-		.medeleg            (0)
+		.sscratch           (next_sscratch),
+		.mideleg            (next_mideleg),
+		.medeleg            (next_medeleg)
 	);
 `endif
 endmodule

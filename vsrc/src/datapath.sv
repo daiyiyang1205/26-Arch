@@ -27,7 +27,9 @@ module datapath import common::*;(
     output logic mem,
     output logic [63:0] aluresultW,
     output logic [63:0] next_mstatus, next_mepc, next_mtval, next_mtvec, 
-                    next_mcause, next_satp, next_mip, next_mie, next_mscratch);
+                    next_mcause, next_satp, next_mip, next_mie, next_mscratch,
+    output logic [63:0] next_sie, next_sip, next_sepc, next_stval, next_stvec,
+			        next_scause, next_sscratch, next_mideleg, next_medeleg);
 
 // pipeline control signal
 
@@ -212,7 +214,9 @@ decode decode(clk, reset, step,
             writecsrD,
             zeimmD,
             next_mstatus, next_mepc, next_mtval, next_mtvec, 
-            next_mcause, next_satp, next_mip, next_mie, next_mscratch);
+            next_mcause, next_satp, next_mip, next_mie, next_mscratch,
+            next_sie, next_sip, next_sepc, next_stval, next_stvec,
+			next_scause, next_sscratch, next_mideleg, next_medeleg);
 
 // forward
 
