@@ -42,15 +42,7 @@ make --version
 
 ## 3. 运行 lab 测试
 
-在项目根目录运行：
-
-```sh
-make test-lab1
-```
-
-首次运行会删除并重新生成 `build/`，然后调用 Verilator 编译仿真器。成功时，末尾会看到类似：
-
-**当前只能在不使用 difftest 的情况下进行测试**
+与 linux 无异。
 
 ## 4. macOS 迁移处理过的问题
 
