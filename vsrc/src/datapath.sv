@@ -29,7 +29,8 @@ module datapath import common::*;(
     output logic [63:0] next_mstatus, next_mepc, next_mtval, next_mtvec, 
                     next_mcause, next_satp, next_mip, next_mie, next_mscratch,
     output logic [63:0] next_sie, next_sip, next_sepc, next_stval, next_stvec,
-			        next_scause, next_sscratch, next_mideleg, next_medeleg);
+			        next_scause, next_sscratch, next_mideleg, next_medeleg,
+    output logic [1:0] next_mode);
 
 // pipeline control signal
 
@@ -56,16 +57,30 @@ assign stall = memreadE & (writeRegE != 0)
 
 // csr stall
 
-logic [1:0] stallcnt;
+logic [1:0] csrstall;
 
 always_ff @(posedge clk) begin
     if (reset) begin
-        stallcnt <= 0;
+        csrstall <= 0;
     end else if (step) begin
-        if (instrF[6:0] == 7'b1110011) begin
-            stallcnt <= 2;
-        end
-        else if (stallcnt >= 1) stallcnt <= stallcnt - 1;
+        if (instrF[6:0] == 7'b1110011) csrstall <= 2;
+        else if (csrstall >= 1) csrstall <= csrstall - 1;
+    end
+end
+
+// ecall & mret stall
+
+logic [1:0] estall;
+
+always_ff @(posedge clk) begin
+    if (reset) begin
+        estall <= 0;
+    end else if (step) begin 
+        if (estall >= 1) estall <= estall - 1;
+        else if (estall == 0 && 
+            (instrF == 32'b000000000000_00000_000_00000_1110011 || 
+            instrF == 32'b001100000010_00000_000_00000_1110011))
+            estall <= 2;
     end
 end
 
@@ -103,6 +118,8 @@ logic brch;
 
 logic [1:0] nextpcsrc;
 
+logic [1:0] epc;
+
 controller ctlr(clk, reset,
             instrD[6:0], 
             instrD[14:12], 
@@ -124,7 +141,13 @@ controller ctlr(clk, reset,
             memtoregD,
             nextpcsrc);
 
-stallreg #(20) cregDE(clk, reset, step, stall,
+always_comb begin
+    if (instrD == 32'b000000000000_00000_000_00000_1110011) epc = 2'b01;
+    else if (instrD == 32'b001100000010_00000_000_00000_1110011) epc = 2'b10;
+    else epc = 2'b00;
+end
+
+stallreg #(20) cregDE(clk, reset, step, stall || estall >= 1,
                 {regwriteD, csrwriteD, regwritecsrD, 
                 csrimmD, oldcsrD, alusrcaD, alusrcbD, alucontrolD,
                 memreadD, memwriteD, signextendD, memsizeD, memtoregD},
@@ -176,12 +199,15 @@ fetch fetch(clk, reset, step,
             fetch_ok,
             others_ok,
             nextpcsrc,
+            epc,
             stall,
-            stallcnt,
+            csrstall,
+            estall,
             pcinit,
             pcbranch,
             pcjal,
             pcjalr,
+            next_mtvec, next_mepc,
             ibus_resp,
             ibus_req,
             pcF, 
@@ -193,6 +219,7 @@ enreg #(96) dregFD(clk, reset, step,
 
 decode decode(clk, reset, step,
             decode_ok,
+            pcD,
             instrD,
             regwriteW,
             csrwriteW,
@@ -202,6 +229,7 @@ decode decode(clk, reset, step,
             writecsrW,
             memresultW,
             csrresultW,
+            estall,
             readData1D,
             readData2D,
             writeRegD,
@@ -216,7 +244,8 @@ decode decode(clk, reset, step,
             next_mstatus, next_mepc, next_mtval, next_mtvec, 
             next_mcause, next_satp, next_mip, next_mie, next_mscratch,
             next_sie, next_sip, next_sepc, next_stval, next_stvec,
-			next_scause, next_sscratch, next_mideleg, next_medeleg);
+			next_scause, next_sscratch, next_mideleg, next_medeleg,
+            next_mode);
 
 // forward
 
@@ -252,7 +281,7 @@ assign pcjalr = (true_readData1D + seIimm) & (~1);
 
 comparer cmp(true_readData1D, true_readData2D, instrD[14:12], brch);
 
-stallreg #(433) dregDE(clk, reset, step, stall,
+stallreg #(433) dregDE(clk, reset, step, stall || estall >= 1,
                 {true_readData1D, true_readData2D, writeRegD, seimmD,
                 csrresultD, writecsrD, zeimmD,
                 pcD, instrD},

@@ -45,6 +45,8 @@ logic [63:0] next_mstatus, next_mepc, next_mtval, next_mtvec,
 logic [63:0] next_sie, next_sip, next_sepc, next_stval, next_stvec,
 			next_scause, next_sscratch, next_mideleg, next_medeleg;
 
+logic [1:0] next_mode;
+
 datapath dp(clk, reset,
     		PCINIT,
     		iresp,
@@ -63,7 +65,8 @@ datapath dp(clk, reset,
 			next_mstatus, next_mepc, next_mtval, next_mtvec, 
             next_mcause, next_satp, next_mip, next_mie, next_mscratch,
 			next_sie, next_sip, next_sepc, next_stval, next_stvec,
-			next_scause, next_sscratch, next_mideleg, next_medeleg);
+			next_scause, next_sscratch, next_mideleg, next_medeleg,
+			next_mode);
 
 `ifdef VERILATOR
 	DifftestInstrCommit DifftestInstrCommit(
@@ -131,7 +134,7 @@ datapath dp(clk, reset,
 	DifftestCSRState DifftestCSRState(
 		.clock              (clk),
 		.coreid             (mhartid[7:0]),
-		.priviledgeMode     (3),
+		.priviledgeMode     (next_mode),
 		.mstatus            (next_mstatus),
 		.sstatus            (next_mstatus & SSTATUS_MASK),
 		.mepc               (next_mepc),

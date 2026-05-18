@@ -10,6 +10,7 @@ module decode import common::*, csr_pkg::*;(
     input  logic step, // 这个信号用来同步整个 CPU 的时序，当其为 1 时，整个 CPU 流水线向前移动一个指令。
     output logic decode_ok, // 表示当前模块是否已经准备好接受下一条指令了
     // 实际上 step = fetch_ok & decode_ok & execute_ok & memory_ok & writeback_ok; 也就是说，只有当五个阶段都准备好接受下一条指令了，step 才会为 1。
+    input  logic [63:0] pc,
     input  logic [31:0] instr,
     input  logic regwrite,
     input  logic csrwrite,
@@ -19,6 +20,7 @@ module decode import common::*, csr_pkg::*;(
     input  logic [11:0] writecsrW,
     input  logic [63:0] memresult,
     input  logic [63:0] csrresult,
+    input  logic [1:0] estall,
     output logic [63:0] readData1,
     output logic [63:0] readData2,
     output logic [4:0] writeRegD,
@@ -33,7 +35,10 @@ module decode import common::*, csr_pkg::*;(
     output logic [63:0] next_mstatus, next_mepc, next_mtval, next_mtvec, 
                 next_mcause, next_satp, next_mip, next_mie, next_mscratch,
     output logic [63:0] next_sie, next_sip, next_sepc, next_stval, next_stvec,
-			    next_scause, next_sscratch, next_mideleg, next_medeleg); // 输出寄存器
+			    next_scause, next_sscratch, next_mideleg, next_medeleg,
+    output logic [1:0] next_mode); // 输出寄存器
+
+// reg
 
 logic [63:0] rf[31:0]; // 主寄存器
 
@@ -65,6 +70,16 @@ logic [4:0] zimm;
 
 logic [63:0] sie, sip, sepc, stval, stvec,
 			scause, sscratch, mideleg, medeleg;
+
+// mode
+
+logic [1:0] mode;
+
+logic ecall, mret;
+
+logic modewrite;
+
+// reg
 
 assign readAddr1 = instr[19:15];
 assign readAddr2 = instr[24:20];
@@ -118,6 +133,8 @@ always_comb begin
     endcase
 end
 
+// reg
+
 assign zimm = instr[19:15];
 
 assign zeimm = {59'b0, zimm};
@@ -136,7 +153,7 @@ always_comb begin
 	end
 end
 
-// csr
+// csr & mode
 
 always_comb begin
     next_mie      = mie;
@@ -158,6 +175,8 @@ always_comb begin
     next_mideleg  = mideleg;
     next_medeleg  = medeleg;
     next_satp     = satp;
+
+    next_mode = mode;
 
     if (csrwrite) begin
         case (writecsrW)
@@ -183,11 +202,37 @@ always_comb begin
             default: ;
         endcase
     end
+
+    if (modewrite && estall == 0) begin
+        if (ecall) begin
+            next_mepc = pc;
+            next_mcause = (mode == 2'b11) ? 11 : 8;
+            next_mstatus[12:11] = mode;
+            next_mstatus[7] = mstatus[3];
+            next_mstatus[3] = 0;
+            next_mode = 2'b11;
+        end
+        else if (mret) begin
+            next_mode = mstatus[12:11];
+            next_mstatus[3] = mstatus[7];
+            next_mstatus[7] = 1;
+            next_mstatus[12:11] = 2'b00;
+        end
+    end
 end
+
+// mode
+
+assign ecall = instr == 32'b000000000000_00000_000_00000_1110011;
+
+assign mret = instr == 32'b001100000010_00000_000_00000_1110011;
+
+assign modewrite = ecall | mret;
 
 always_ff @(posedge clk) begin
     if (reset) begin
         decode_ok <= 1;
+        mode <= 2'b11;
     end else if (step) begin
         decode_ok <= 0; // 先把 decode_ok 置为 0，表示我们正在处理当前指令，还没有准备好接受下一条指令了。
         if (regwrite && writeAddr3 != 0) rf[writeAddr3] <= writeData3;
@@ -219,6 +264,12 @@ always_ff @(posedge clk) begin
             endcase
         end
         else mcycle <= mcycle + 1;
+        if (modewrite && estall == 0) begin
+            mepc <= next_mepc;
+            mcause <= next_mcause;
+            mstatus <= next_mstatus & MSTATUS_MASK;
+            mode <= next_mode;
+        end
     end else begin
         mcycle <= mcycle + 1;
         // 这里对应：要么我们还没译码好指令，要么我们译码好指令了，在等其他模块
