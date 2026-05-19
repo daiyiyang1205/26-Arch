@@ -1,6 +1,7 @@
 `ifdef VERILATOR
 `include "include/common.sv"
 `include "src/core.sv"
+`include "src/mmu.sv"
 `include "util/IBusToCBus.sv"
 `include "util/DBusToCBus.sv"
 `include "util/CBusArbiter.sv"
@@ -30,8 +31,14 @@ module SimTop import common::*;(
     cbus_req_t  icreq,  dcreq;
     cbus_resp_t icresp, dcresp;
 
+    logic [1:0] mode;
+	  logic [63:0] satp;
+
+    logic [63:0] paddr;
+
     core core(
-      .clk(clock), .reset, .ireq, .iresp, .dreq, .dresp, .trint, .swint, .exint
+      .clk(clock), .reset, .ireq, .iresp, .dreq, .dresp, .trint, .swint, .exint,
+      .next_mode(mode), .next_satp(satp), .paddr
     );
 
     IBusToCBus icvt(.*);
@@ -43,9 +50,12 @@ module SimTop import common::*;(
         .*
     );
 
-    RAMHelper2 ram(
-        .clk(clock), .reset, .oreq, .oresp, .trint, .swint, .exint
-    );
+    mmu mmu(.clk(clock), .reset,
+            .trint, .swint, .exint,
+            .mode, .satp,
+            .vreq(oreq),
+            .paddr,
+            .presp(oresp));
 
     assign {io_uart_out_valid, io_uart_out_ch, io_uart_in_valid} = '0;
 

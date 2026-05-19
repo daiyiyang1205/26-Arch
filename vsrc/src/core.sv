@@ -13,9 +13,11 @@ module core import common::*, csr_pkg::*;(
 	input  ibus_resp_t iresp,
 	output dbus_req_t  dreq,
 	input  dbus_resp_t dresp,
-	input  logic       trint, swint, exint
+	input  logic       trint, swint, exint,
+	output logic [1:0] next_mode,
+	output logic [63:0] next_satp,
+	input  logic [63:0] paddr
 );
-	/* TODO: Add your CPU-Core here. */
 
 logic [63:0] next_reg[31:0];
 
@@ -40,12 +42,10 @@ logic [63:0] mhartid;
 assign mhartid = 0;
 
 logic [63:0] next_mstatus, next_mepc, next_mtval, next_mtvec, 
-            next_mcause, next_satp, next_mip, next_mie, next_mscratch;
+            next_mcause, next_mip, next_mie, next_mscratch;
 
 logic [63:0] next_sie, next_sip, next_sepc, next_stval, next_stvec,
 			next_scause, next_sscratch, next_mideleg, next_medeleg;
-
-logic [1:0] next_mode;
 
 datapath dp(clk, reset,
     		PCINIT,
@@ -76,7 +76,7 @@ datapath dp(clk, reset,
 		.valid              (valid),
 		.pc                 (pc),
 		.instr              (instr),
-		.skip               ((mem & memaddr[31] == 0)),
+		.skip               ((mem & paddr[31] == 0)),
 		.isRVC              (0),
 		.scFailed           (0),
 		.wen                (regwrite),
