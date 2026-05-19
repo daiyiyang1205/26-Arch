@@ -10,8 +10,15 @@ init:
 	git submodule update --init --recursive
 
 handin:
-	@if [ ! -f docs/report.pdf ]; then \
-		echo "Please write your report in the 'docs' folder and convert it to 'report.pdf' first"; \
+	@report_files=""; \
+	if [ -f docs/report.md ]; then \
+		report_files="$$report_files docs/report.md"; \
+	fi; \
+	if [ -f docs/report.pdf ]; then \
+		report_files="$$report_files docs/report.pdf"; \
+	fi; \
+	if [ -z "$$report_files" ]; then \
+		echo "Please put your report in the 'docs' folder as 'report.md' or 'report.pdf'"; \
 		exit 1; \
 	fi; \
 	echo "Please enter your 'student id-name' (e.g., 12345678910-someone)"; \
@@ -19,7 +26,7 @@ handin:
 	echo "Please enter lab number (e.g., 1)"; \
 	read lab_n; \
 	zip -q -r "docs/$$filename-lab$$lab_n.zip" \
-	  include vsrc docs/report.pdf
+	  include vsrc $$report_files
 
 sim-verilog:
 	@echo "I don't know why, just make difftest happy..."
