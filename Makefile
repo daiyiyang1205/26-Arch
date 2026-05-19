@@ -10,23 +10,31 @@ init:
 	git submodule update --init --recursive
 
 handin:
-	@report_files=""; \
-	if [ -f docs/report.md ]; then \
-		report_files="$$report_files docs/report.md"; \
-	fi; \
-	if [ -f docs/report.pdf ]; then \
-		report_files="$$report_files docs/report.pdf"; \
-	fi; \
-	if [ -z "$$report_files" ]; then \
-		echo "Please put your report in the 'docs' folder as 'report.md' or 'report.pdf'"; \
-		exit 1; \
+	@report_found=""; \
+	if [ -d docs/report ]; then \
+		if [ ! -f docs/report/report.md ] && [ ! -f docs/report/report.pdf ]; then \
+			echo "Please put 'report.md' or 'report.pdf' in 'docs/report'"; \
+			exit 1; \
+		fi; \
+		report_found=1; \
+	else \
+		if [ -f docs/report.md ]; then \
+			report_found=1; \
+		fi; \
+		if [ -f docs/report.pdf ]; then \
+			report_found=1; \
+		fi; \
+		if [ -z "$$report_found" ]; then \
+			echo "Please put your report in 'docs/report/' or as 'docs/report.md' or 'docs/report.pdf'"; \
+			exit 1; \
+		fi; \
 	fi; \
 	echo "Please enter your 'student id-name' (e.g., 12345678910-someone)"; \
 	read filename; \
 	echo "Please enter lab number (e.g., 1)"; \
 	read lab_n; \
 	zip -q -r "docs/$$filename-lab$$lab_n.zip" \
-	  include vsrc $$report_files
+	  include vsrc docs -x "docs/*.zip"
 
 sim-verilog:
 	@echo "I don't know why, just make difftest happy..."
