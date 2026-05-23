@@ -57,20 +57,20 @@ assign stall = memreadE & (writeRegE != 0)
 
 // csr stall
 
-logic [1:0] csrstall;
+logic [2:0] csrstall;
 
 always_ff @(posedge clk) begin
     if (reset) begin
         csrstall <= 0;
     end else if (step) begin
-        if (instrF[6:0] == 7'b1110011) csrstall <= 2;
+        if (instrF[6:0] == 7'b1110011) csrstall <= 4;
         else if (csrstall >= 1) csrstall <= csrstall - 1;
     end
 end
 
 // ecall & mret stall
 
-logic [1:0] estall;
+logic [2:0] estall;
 
 always_ff @(posedge clk) begin
     if (reset) begin
@@ -80,7 +80,7 @@ always_ff @(posedge clk) begin
         else if (estall == 0 && 
             (instrF == 32'b000000000000_00000_000_00000_1110011 || 
             instrF == 32'b001100000010_00000_000_00000_1110011))
-            estall <= 2;
+            estall <= 4;
     end
 end
 

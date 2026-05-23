@@ -20,7 +20,7 @@ module decode import common::*, csr_pkg::*;(
     input  logic [11:0] writecsrW,
     input  logic [63:0] memresult,
     input  logic [63:0] csrresult,
-    input  logic [1:0] estall,
+    input  logic [2:0] estall,
     output logic [63:0] readData1,
     output logic [63:0] readData2,
     output logic [4:0] writeRegD,

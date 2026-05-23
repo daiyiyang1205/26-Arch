@@ -19,7 +19,6 @@ cbus_req_t preq_mmu;
 
 assign mmu_valid = (mode == 2'b11 && satp[63:60] == 4'b1000);
 
-// 非 MMU: 直接组合赋值；MMU: 使用寄存器
 assign preq = mmu_valid ? preq_mmu : vreq;
 
 logic [3:0] status;
@@ -111,7 +110,7 @@ always_ff @(posedge clk) begin
                 end
             end
 
-                4'b0100: begin // 情况4, 发出第3次寻址请求
+            4'b0100: begin // 情况4, 发出第3次寻址请求
                 req3.valid <= 1;
                 req3.size <= MSIZE8;
                 req3.addr <= base3 + (id3 << 3);

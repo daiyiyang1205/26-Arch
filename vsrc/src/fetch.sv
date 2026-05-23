@@ -13,8 +13,8 @@ module fetch import common::*;(
     input  logic [1:0] nextpcsrc,
     input  logic [1:0] epc, 
     input  logic stall,
-    input  logic [1:0] csrstall,
-    input  logic [1:0] estall,
+    input  logic [2:0] csrstall,
+    input  logic [2:0] estall,
     input  logic [63:0] pcinit,
     input  logic [63:0] pcbranch,
     input  logic [63:0] pcjal,
@@ -31,7 +31,7 @@ logic [31:0] nextinstr;
 
 mux4 pcsrc1(pc + 4, pcbranch, pcjal, pcjalr, nextpcsrc, tmppc);
 
-mux3 pcsrc2(tmppc, mtvec, mepc + 4, epc, nextpc);
+mux3 pcsrc2(tmppc, mtvec, mepc, epc, nextpc);
 
 always_ff @(posedge clk) begin
     if (reset) begin

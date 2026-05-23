@@ -25,6 +25,11 @@ module VTop
     cbus_req_t  icreq,  dcreq;
     cbus_resp_t icresp, dcresp;
 
+    logic [1:0] next_mode;
+	logic [63:0] next_satp;
+
+    logic [63:0] paddr;
+
     core core(.*);
     IBusToCBus icvt(.*);
 
