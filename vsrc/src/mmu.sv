@@ -9,151 +9,152 @@ module mmu import common::*;(
     input  logic [63:0] satp,
     input  cbus_req_t vreq,
     output logic [63:0] paddr,
-    output cbus_resp_t presp);
-
-logic mmu_valid;
-
-cbus_req_t preq;
-
-cbus_req_t preq_mmu;
-
-assign mmu_valid = (mode == 2'b11 && satp[63:60] == 4'b1000);
-
-assign preq = mmu_valid ? preq_mmu : vreq;
-
-logic [3:0] status;
-
-logic [63:0] base1, base2, base3;
-
-logic [63:0] id1, id2, id3;
-
-logic [63:0] data1, data2, data3;
-
-cbus_req_t req1, req2, req3;
-
-cbus_resp_t resp1, resp2, resp3;
-
-assign base1 = {8'b0, satp[43:0], 12'b0};
-
-assign id1 = {55'b0, vreq.addr[38:30]};
-
-RAMHelper2 ram1(
-    .clk, .reset, .oreq(req1), .oresp(resp1), .trint, .swint, .exint
+    output cbus_resp_t presp
 );
 
-assign base2 = {8'b0, data1[53:10], 12'b0};
+    logic mmu_valid;
+    cbus_req_t  oreq_reg;          // 分时复用的请求寄存器
+    cbus_req_t  oreq;              // 实际驱动 RAMHelper2 的请求
+    cbus_resp_t oresp;            // RAMHelper2 的响应
 
-assign id2 = {55'b0, vreq.addr[29:21]};
+    logic [3:0] status;
+    logic [63:0] base1, base2, base3;
+    logic [63:0] id1, id2, id3;
+    logic [63:0] data1, data2, data3;
 
-RAMHelper2 ram2(
-    .clk, .reset, .oreq(req2), .oresp(resp2), .trint, .swint, .exint
-);
+    assign mmu_valid = (mode == 2'b00 && satp[63:60] == 4'b1000);
 
-assign base3 = {8'b0, data2[53:10], 12'b0};
+    // 组合逻辑：根据工作模式选择请求来源
+    assign oreq = mmu_valid ? oreq_reg : vreq;
 
-assign id3 = {55'b0, vreq.addr[20:12]};
+    // 地址计算（组合）
+    assign base1 = {8'b0, satp[43:0], 12'b0};
+    assign id1   = {55'b0, vreq.addr[38:30]};
 
-RAMHelper2 ram3(
-    .clk, .reset, .oreq(req3), .oresp(resp3), .trint, .swint, .exint
-);
+    assign base2 = {8'b0, data1[53:10], 12'b0};
+    assign id2   = {55'b0, vreq.addr[29:21]};
 
-assign paddr = {8'b0, data3[53:10], vreq.addr[11:0]};
+    assign base3 = {8'b0, data2[53:10], 12'b0};
+    assign id3   = {55'b0, vreq.addr[20:12]};
 
-RAMHelper2 pram(
-    .clk, .reset, .oreq(preq), .oresp(presp), .trint, .swint, .exint
-);
+    assign paddr = mmu_valid ? {8'b0, data3[53:10], vreq.addr[11:0]} : vreq.addr;
 
-always_ff @(posedge clk) begin
-    if (reset) begin
-        status <= 0;
-        req1 <= 0;
-        req2 <= 0;
-        req3 <= 0;
-        preq_mmu <= 0;
+    // 仅当 MMU 使能且处于物理地址响应阶段时，才向外部暴露响应
+    assign presp = mmu_valid ? 
+                    ((status == 4'b0111) ? oresp : cbus_resp_t'{ready:0, last:0, data:0})
+                    : oresp;
+
+    // 唯一的一个 RAM 助手实例
+    RAMHelper2 ram (
+        .clk   (clk),
+        .reset (reset),
+        .oreq  (oreq),
+        .oresp (oresp),
+        .trint (trint),
+        .swint (swint),
+        .exint (exint)
+    );
+
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            status    <= 4'b0000;
+            oreq_reg  <= '0;
+            data1     <= '0;
+            data2     <= '0;
+            data3     <= '0;
+        end
+        else if (!mmu_valid) begin
+            // 非 MMU 模式或模式切换时复位状态机
+            status   <= 4'b0000;
+            oreq_reg <= '0;
+        end
+        else begin
+            case (status)
+                4'b0000: begin // 等待虚拟请求，发起第一级页表读
+                    if (vreq.valid) begin
+                        oreq_reg.valid   <= 1'b1;
+                        oreq_reg.size    <= MSIZE8;
+                        oreq_reg.addr    <= base1 + (id1 << 3);
+                        oreq_reg.len     <= MLEN1;
+                        oreq_reg.burst   <= AXI_BURST_FIXED;
+                        // 读请求无需写信号，保持默认 0
+                        oreq_reg.is_write <= 1'b0;
+                        oreq_reg.strobe  <= '0;
+                        oreq_reg.data    <= '0;
+                        status <= 4'b0001;
+                    end
+                end
+
+                4'b0001: begin // 等待第一级页表结果
+                    if (oresp.ready && oresp.last) begin
+                        data1 <= oresp.data;
+                        oreq_reg.valid <= 1'b0;
+                        status <= 4'b0010;
+                    end
+                end
+
+                4'b0010: begin // 发起第二级页表读
+                    oreq_reg.valid <= 1'b1;
+                    oreq_reg.size  <= MSIZE8;
+                    oreq_reg.addr  <= base2 + (id2 << 3);
+                    oreq_reg.len   <= MLEN1;
+                    oreq_reg.burst <= AXI_BURST_FIXED;
+                    status <= 4'b0011;
+                end
+
+                4'b0011: begin // 等待第二级页表结果
+                    if (oresp.ready && oresp.last) begin
+                        data2 <= oresp.data;
+                        oreq_reg.valid <= 1'b0;
+                        status <= 4'b0100;
+                    end
+                end
+
+                4'b0100: begin // 发起第三级页表读
+                    oreq_reg.valid <= 1'b1;
+                    oreq_reg.size  <= MSIZE8;
+                    oreq_reg.addr  <= base3 + (id3 << 3);
+                    oreq_reg.len   <= MLEN1;
+                    oreq_reg.burst <= AXI_BURST_FIXED;
+                    status <= 4'b0101;
+                end
+
+                4'b0101: begin // 等待第三级页表结果
+                    if (oresp.ready && oresp.last) begin
+                        data3 <= oresp.data;
+                        oreq_reg.valid <= 1'b0;
+                        status <= 4'b0110;
+                    end
+                end
+
+                4'b0110: begin // 发出最终的物理地址请求
+                    oreq_reg.valid    <= 1'b1;
+                    oreq_reg.is_write <= vreq.is_write;
+                    oreq_reg.size     <= vreq.size;
+                    oreq_reg.addr     <= paddr;
+                    oreq_reg.strobe   <= vreq.strobe;
+                    oreq_reg.data     <= vreq.data;
+                    oreq_reg.len      <= vreq.len;
+                    oreq_reg.burst    <= vreq.burst;
+                    status <= 4'b0111;
+                end
+
+                4'b0111: begin // 等待物理地址响应结束
+                    if (oresp.ready && oresp.last) begin
+                        oreq_reg.valid <= 1'b0;
+                        status <= 4'b1000;
+                    end
+                end
+
+                4'b1000: begin // 等待虚拟请求撤销
+                    if (!vreq.valid) begin
+                        status <= 4'b0000;
+                    end
+                end
+
+                default: status <= 4'b0000;
+            endcase
+        end
     end
-    else if (mmu_valid) begin
-        // 启用mmu
-        case(status)
-            4'b0000: begin // 情况0, 等待vreq.valid信号, 并发出第1次寻址请求
-                if (vreq.valid) begin
-                    req1.valid <= 1;
-                    req1.size <= MSIZE8;
-                    req1.addr <= base1 + (id1 << 3);
-                    req1.len <= MLEN1;
-                    req1.burst <= AXI_BURST_FIXED;
-                    status <= 4'b0001;
-                end
-            end
 
-            4'b0001: begin // 情况1, 等待第1次寻址结果
-                if (resp1.ready && resp1.last) begin
-                    data1 <= resp1.data;
-                    req1.valid <= 0;
-                    status <= 4'b0010;
-                end
-            end
-
-            4'b0010: begin // 情况2, 发出第2次寻址请求
-                req2.valid <= 1;
-                req2.size <= MSIZE8;
-                req2.addr <= base2 + (id2 << 3);
-                req2.len <= MLEN1;
-                req2.burst <= AXI_BURST_FIXED;
-                status <= 4'b0011;
-            end
-
-            4'b0011: begin // 情况3, 等待第2次寻址结果
-                if (resp2.ready && resp2.last) begin
-                    data2 <= resp2.data;
-                    req2.valid <= 0;
-                    status <= 4'b0100;
-                end
-            end
-
-            4'b0100: begin // 情况4, 发出第3次寻址请求
-                req3.valid <= 1;
-                req3.size <= MSIZE8;
-                req3.addr <= base3 + (id3 << 3);
-                req3.len <= MLEN1;
-                req3.burst <= AXI_BURST_FIXED;
-                status <= 4'b0101;
-            end
-
-            4'b0101: begin // 情况5, 等待第3次寻址结果
-                if (resp3.ready && resp3.last) begin
-                    data3 <= resp3.data;
-                    req3.valid <= 0;
-                    status <= 4'b0110;
-                end
-            end
-
-            4'b0110: begin // 情况6, 发出物理地址请求
-                preq_mmu.valid <= 1;
-                preq_mmu.is_write <= vreq.is_write;
-                preq_mmu.size <= vreq.size;
-                preq_mmu.addr <= paddr;
-                preq_mmu.strobe <= vreq.strobe;
-                preq_mmu.data <= vreq.data;
-                preq_mmu.len <= vreq.len;
-                preq_mmu.burst <= vreq.burst;
-                status <= 4'b0111;
-            end
-
-            4'b0111: begin // 情况7, 等待物理地址请求
-                if (presp.ready && presp.last) begin
-                    preq_mmu.valid <= 0;
-                    status <= 4'b1000;
-                end
-            end
-
-            4'b1000: begin // 情况8, 等待虚拟地址结束请求
-                if (!vreq.valid) begin
-                    status <= 4'b0000;
-                end
-            end
-            default: ;
-        endcase
-    end
-end
-    
 endmodule

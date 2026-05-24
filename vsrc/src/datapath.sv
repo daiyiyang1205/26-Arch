@@ -63,7 +63,7 @@ always_ff @(posedge clk) begin
     if (reset) begin
         csrstall <= 0;
     end else if (step) begin
-        if (instrF[6:0] == 7'b1110011) csrstall <= 4;
+        if (instrF[6:0] == 7'b1110011) csrstall <= 3;
         else if (csrstall >= 1) csrstall <= csrstall - 1;
     end
 end
@@ -80,7 +80,7 @@ always_ff @(posedge clk) begin
         else if (estall == 0 && 
             (instrF == 32'b000000000000_00000_000_00000_1110011 || 
             instrF == 32'b001100000010_00000_000_00000_1110011))
-            estall <= 4;
+            estall <= 3;
     end
 end
 
@@ -118,7 +118,7 @@ logic brch;
 
 logic [1:0] nextpcsrc;
 
-logic [1:0] epc;
+logic [1:0] epcD, epcE, epcM, epcW;
 
 controller ctlr(clk, reset,
             instrD[6:0], 
@@ -142,28 +142,34 @@ controller ctlr(clk, reset,
             nextpcsrc);
 
 always_comb begin
-    if (instrD == 32'b000000000000_00000_000_00000_1110011) epc = 2'b01;
-    else if (instrD == 32'b001100000010_00000_000_00000_1110011) epc = 2'b10;
-    else epc = 2'b00;
+    if (instrD == 32'b000000000000_00000_000_00000_1110011) epcD = 2'b01;
+    else if (instrD == 32'b001100000010_00000_000_00000_1110011) epcD = 2'b10;
+    else epcD = 2'b00;
 end
 
-stallreg #(20) cregDE(clk, reset, step, stall || estall >= 1,
+stallreg #(22) cregDE(clk, reset, step, stall,
                 {regwriteD, csrwriteD, regwritecsrD, 
                 csrimmD, oldcsrD, alusrcaD, alusrcbD, alucontrolD,
-                memreadD, memwriteD, signextendD, memsizeD, memtoregD},
+                memreadD, memwriteD, signextendD, memsizeD, memtoregD,
+                epcD},
                 {regwriteE, csrwriteE, regwritecsrE, 
                 csrimmE, oldcsrE, alusrcaE, alusrcbE, alucontrolE,
-                memreadE, memwriteE, signextendE, memsizeE, memtoregE});
+                memreadE, memwriteE, signextendE, memsizeE, memtoregE,
+                epcE});
 
-enreg #(10) cregEM(clk, reset, step,
+enreg #(12) cregEM(clk, reset, step,
                 {regwriteE, csrwriteE, regwritecsrE, 
-                memreadE, memwriteE, signextendE, memsizeE, memtoregE}, 
+                memreadE, memwriteE, signextendE, memsizeE, memtoregE,
+                epcE}, 
                 {regwriteM, csrwriteM, regwritecsrM, 
-                memreadM, memwriteM, signextendM, memsizeM, memtoregM});
+                memreadM, memwriteM, signextendM, memsizeM, memtoregM,
+                epcM});
 
-enreg #(5) cregMW(clk, reset, step,
-                {regwriteM, csrwriteM, regwritecsrM, memreadM, memwriteM},
-                {regwriteW, csrwriteW, regwritecsrW, memreadW, memwriteW});
+enreg #(7) cregMW(clk, reset, step,
+                {regwriteM, csrwriteM, regwritecsrM, memreadM, memwriteM,
+                epcM},
+                {regwriteW, csrwriteW, regwritecsrW, memreadW, memwriteW,
+                epcW});
 
 assign mem = memreadW | memwriteW;
 
@@ -199,7 +205,7 @@ fetch fetch(clk, reset, step,
             fetch_ok,
             others_ok,
             nextpcsrc,
-            epc,
+            epcW,
             stall,
             csrstall,
             estall,
@@ -221,6 +227,8 @@ decode decode(clk, reset, step,
             decode_ok,
             pcD,
             instrD,
+            pcW,
+            instrW,
             regwriteW,
             csrwriteW,
             regwritecsrW,
@@ -229,7 +237,6 @@ decode decode(clk, reset, step,
             writecsrW,
             memresultW,
             csrresultW,
-            estall,
             readData1D,
             readData2D,
             writeRegD,
@@ -281,7 +288,7 @@ assign pcjalr = (true_readData1D + seIimm) & (~1);
 
 comparer cmp(true_readData1D, true_readData2D, instrD[14:12], brch);
 
-stallreg #(433) dregDE(clk, reset, step, stall || estall >= 1,
+stallreg #(433) dregDE(clk, reset, step, stall,
                 {true_readData1D, true_readData2D, writeRegD, seimmD,
                 csrresultD, writecsrD, zeimmD,
                 pcD, instrD},

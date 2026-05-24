@@ -12,6 +12,8 @@ module decode import common::*, csr_pkg::*;(
     // 实际上 step = fetch_ok & decode_ok & execute_ok & memory_ok & writeback_ok; 也就是说，只有当五个阶段都准备好接受下一条指令了，step 才会为 1。
     input  logic [63:0] pc,
     input  logic [31:0] instr,
+    input  logic [63:0] pcW,
+    input  logic [31:0] instrW,
     input  logic regwrite,
     input  logic csrwrite,
     input  logic regwritecsr,
@@ -20,7 +22,6 @@ module decode import common::*, csr_pkg::*;(
     input  logic [11:0] writecsrW,
     input  logic [63:0] memresult,
     input  logic [63:0] csrresult,
-    input  logic [2:0] estall,
     output logic [63:0] readData1,
     output logic [63:0] readData2,
     output logic [4:0] writeRegD,
@@ -203,9 +204,9 @@ always_comb begin
         endcase
     end
 
-    if (modewrite && estall == 0) begin
+    if (modewrite) begin
         if (ecall) begin
-            next_mepc = pc;
+            next_mepc = pcW;
             next_mcause = (mode == 2'b11) ? 11 : 8;
             next_mstatus[12:11] = mode;
             next_mstatus[7] = mstatus[3];
@@ -223,9 +224,9 @@ end
 
 // mode
 
-assign ecall = instr == 32'b000000000000_00000_000_00000_1110011;
+assign ecall = instrW == 32'b000000000000_00000_000_00000_1110011;
 
-assign mret = instr == 32'b001100000010_00000_000_00000_1110011;
+assign mret = instrW == 32'b001100000010_00000_000_00000_1110011;
 
 assign modewrite = ecall | mret;
 
@@ -264,7 +265,7 @@ always_ff @(posedge clk) begin
             endcase
         end
         else mcycle <= mcycle + 1;
-        if (modewrite && estall == 0) begin
+        if (modewrite) begin
             mepc <= next_mepc;
             mcause <= next_mcause;
             mstatus <= next_mstatus & MSTATUS_MASK;

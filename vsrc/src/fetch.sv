@@ -41,17 +41,11 @@ always_ff @(posedge clk) begin
         ibus_req.addr <= 0;
     end else if (step) begin
         fetch_ok <= 0;
-        ibus_req.valid <= 1;
-        ibus_req.addr <= pc;
     end else begin
         if (fetch_ok) begin
             // 在等其他模块
         end
-        else if (ibus_resp.data_ok & ibus_resp.addr_ok) begin // 指令取完了
-            nextinstr <= ibus_resp.data;
-            ibus_req.valid <= 0;
-        end
-        else if (ibus_req.valid == 0 && others_ok) begin // 指令取完了并且其他模块也完成了
+        else if (others_ok) begin
             // 情况1：load-use阻塞
             if (stall) begin
                 fetch_ok <= 1;
@@ -63,6 +57,7 @@ always_ff @(posedge clk) begin
             end
             // 情况3：ecall, mret阻塞
             else if (estall >= 1) begin
+                instr <= 32'b0;
                 fetch_ok <= 1;
             end
             // 情况4：发生普通跳转
@@ -78,8 +73,13 @@ always_ff @(posedge clk) begin
                 fetch_ok <= 1;
             end
             // 情况6：取当前pc指向的指令
-            else begin
-                instr <= nextinstr;
+            else if (ibus_req.valid == 0) begin
+                ibus_req.valid <= 1;
+                ibus_req.addr <= pc;
+            end
+            else if (ibus_resp.data_ok & ibus_resp.addr_ok) begin
+                instr <= ibus_resp.data;
+                ibus_req.valid <= 0;
                 nowpc <= pc;
                 pc <= nextpc;
                 fetch_ok <= 1;
