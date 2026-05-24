@@ -4,6 +4,7 @@
 `ifdef VERILATOR
 `include "include/common.sv"
 `include "src/core.sv"
+`include "src/mmu_v.sv"
 `include "util/IBusToCBus.sv"
 `include "util/DBusToCBus.sv"
 `include "util/CBusArbiter.sv"
@@ -30,6 +31,9 @@ module VTop
 
     logic [63:0] paddr;
 
+    cbus_req_t  vreq;
+    cbus_resp_t vresp;
+
     core core(.*);
     IBusToCBus icvt(.*);
 
@@ -39,8 +43,18 @@ module VTop
     CBusArbiter mux(
         .ireqs({icreq, dcreq}),
         .iresps({icresp, dcresp}),
+        .oreq(vreq),
+        .oresp(vresp),
         .*
     );
+
+    mmu_v mmu_v(.clk, .reset,
+            .mode(next_mode), .satp(next_satp),
+            .oreq,
+            .oresp,
+            .vreq,
+            .vresp,
+            .paddr);
 
 	always_ff @(posedge clk) begin
 		if (~reset) begin
