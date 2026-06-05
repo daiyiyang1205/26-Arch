@@ -207,7 +207,8 @@ always_comb begin
     if (modewrite) begin
         if (ecall) begin
             next_mepc = pcW;
-            next_mcause = (mode == 2'b11) ? 11 : 8;
+            next_mcause[63] = 0;
+            next_mcause[62:0] = (mode == 2'b11) ? 11 : 8;
             next_mstatus[12:11] = mode;
             next_mstatus[7] = mstatus[3];
             next_mstatus[3] = 0;
@@ -218,6 +219,7 @@ always_comb begin
             next_mstatus[3] = mstatus[7];
             next_mstatus[7] = 1;
             next_mstatus[12:11] = 2'b00;
+            next_mstatus[15:14] = 2'b00;
         end
     end
 end
