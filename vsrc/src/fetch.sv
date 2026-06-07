@@ -14,7 +14,7 @@ module fetch import common::*;(
     input  logic [1:0] epc, 
     input  logic stall,
     input  logic [2:0] csrstall,
-    input  logic [2:0] estall,
+    input  logic estall,
     input  logic exception,
     input  logic interruption,
     input  logic [63:0] pcinit,
@@ -58,7 +58,7 @@ always_ff @(posedge clk) begin
                 fetch_ok <= 1;
             end
             // 情况3：ecall, mret阻塞
-            else if (estall >= 1) begin
+            else if (estall) begin
                 instr <= 32'b0;
                 fetch_ok <= 1;
             end

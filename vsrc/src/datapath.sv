@@ -72,19 +72,26 @@ end
 
 // ecall & mret stall
 
-logic [2:0] estall;
+logic estall;
 
-always_ff @(posedge clk) begin
-    if (reset) begin
-        estall <= 0;
-    end else if (step) begin 
-        if (estall >= 1) estall <= estall - 1;
-        else if (estall == 0 && 
-            (instrF == 32'b000000000000_00000_000_00000_1110011 || 
-            instrF == 32'b001100000010_00000_000_00000_1110011))
-            estall <= 3;
-    end
-end
+logic estallD, estallE, estallM, estallW;
+
+assign estallD = (instrF == 32'b000000000000_00000_000_00000_1110011 || 
+            instrF == 32'b001100000010_00000_000_00000_1110011);
+
+assign estall = estallD | estallE | estallM;
+
+enreg #(1) regDE(clk, reset, step,
+                {estallD},
+                {estallE});
+
+enreg #(1) regEM(clk, reset, step,
+                {estallE}, 
+                {estallM});
+
+enreg #(1) regMW(clk, reset, step,
+                {estallM},
+                {estallW});
 
 // Exception
 
@@ -146,13 +153,16 @@ assign interruptionF = clkintD | extintD | sfwintD |
 always_ff @(posedge clk) begin
     if (reset) begin
     end else if (step) begin
-        if (estall == 0 && !exceptionF && !interruptionF &&
+        if (instrF[6:0] != 7'b1110011 && instrD[6:0] != 7'b1110011 &&
+            instrE[6:0] != 7'b1110011 && instrM[6:0] != 7'b1110011 &&
+            instrW[6:0] != 7'b1110011 &&
+            !estall && !exceptionF && !interruptionF &&
             (next_mode != 2'b11 || next_mode == 2'b11 && next_mstatus[3] == 1)) begin
-            if (exint && next_mie[11] == 1)
+            if (next_mip[11] == 1 && next_mie[11] == 1)
                 extintD <= 1;
-            else if (trint && next_mie[7] == 1)
+            else if (next_mip[7] == 1 && next_mie[7] == 1)
                 clkintD <= 1;
-            else if (swint && next_mie[3] == 1)
+            else if (next_mip[3] == 1 && next_mie[3] == 1)
                 sfwintD <= 1;
         end
     end
