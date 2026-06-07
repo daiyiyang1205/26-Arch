@@ -31,7 +31,8 @@ module datapath import common::*;(
                     next_mcause, next_satp, next_mip, next_mie, next_mscratch,
     output logic [63:0] next_sie, next_sip, next_sepc, next_stval, next_stvec,
 			        next_scause, next_sscratch, next_mideleg, next_medeleg,
-    output logic [1:0] next_mode);
+    output logic [1:0] next_mode,
+    input  logic trint, swint, exint);
 
 // pipeline control signal
 
@@ -128,6 +129,47 @@ enreg #(4) eregMW(clk, reset, step,
                 {illegal_instrM, iaddr_misaliM, laddr_misaliM, saddr_misaliM},
                 {illegal_instrW, iaddr_misaliW, laddr_misaliW, saddr_misaliW});
 
+// interruption
+
+logic interruptionF;
+
+logic clkintD, clkintE, clkintM, clkintW;
+
+logic extintD, extintE, extintM, extintW;
+
+logic sfwintD, sfwintE, sfwintM, sfwintW;
+
+assign interruptionF = clkintD | extintD | sfwintD | 
+                        clkintE | extintE | sfwintE | 
+                        clkintM | extintM | sfwintM;
+
+always_ff @(posedge clk) begin
+    if (reset) begin
+    end else if (step) begin
+        if (!exceptionF && !interruptionF &&
+            (next_mode != 2'b11 || next_mode == 2'b11 && next_mstatus[3] == 1)) begin
+            if (exint && next_mie[11] == 1)
+                extintD <= 1;
+            else if (trint && next_mie[7] == 1)
+                clkintD <= 1;
+            else if (swint && next_mie[3] == 1)
+                sfwintD <= 1;
+        end
+    end
+end
+
+enreg #(3) iregDE(clk, reset, step,
+                {clkintD, extintD, sfwintD},
+                {clkintE, extintE, sfwintE});
+
+enreg #(3) iregEM(clk, reset, step,
+                {clkintE, extintE, sfwintE}, 
+                {clkintM, extintM, sfwintM});
+
+enreg #(3) iregMW(clk, reset, step,
+                {clkintM, extintM, sfwintM},
+                {clkintW, extintW, sfwintW});
+
 // controller
 
 logic regwriteD, regwriteE, regwriteM;
@@ -187,7 +229,8 @@ controller ctlr(clk, reset,
 
 always_comb begin
     if (instrD == 32'b000000000000_00000_000_00000_1110011 || 
-        illegal_instrD || iaddr_misaliD || laddr_misali || saddr_misaliD    
+        illegal_instrD || iaddr_misaliD || laddr_misali || saddr_misaliD ||
+        clkintD || extintD || sfwintD   
     ) epcD = 2'b01;
     else if (instrD == 32'b001100000010_00000_000_00000_1110011) epcD = 2'b10;
     else epcD = 2'b00;
@@ -256,6 +299,7 @@ fetch fetch(clk, reset, step,
             csrstall,
             estall,
             exceptionF,
+            interruptionF,
             pcinit,
             pcbranch,
             pcjal,
@@ -300,7 +344,11 @@ decode decode(clk, reset, step,
             next_sie, next_sip, next_sepc, next_stval, next_stvec,
 			next_scause, next_sscratch, next_mideleg, next_medeleg,
             next_mode,
-            illegal_instrW, iaddr_misaliW, laddr_misaliW, saddr_misaliW);
+            illegal_instrW, iaddr_misaliW, laddr_misaliW, saddr_misaliW,
+            trint, swint, exint,
+            clkintW,
+            extintW,
+            sfwintW);
 
 // forward
 

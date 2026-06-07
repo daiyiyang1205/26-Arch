@@ -66,7 +66,8 @@ datapath dp(clk, reset,
             next_mcause, next_satp, next_mip, next_mie, next_mscratch,
 			next_sie, next_sip, next_sepc, next_stval, next_stvec,
 			next_scause, next_sscratch, next_mideleg, next_medeleg,
-			next_mode);
+			next_mode,
+			trint, swint, exint);
 
 `ifdef VERILATOR
 	DifftestInstrCommit DifftestInstrCommit(

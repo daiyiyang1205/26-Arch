@@ -27,29 +27,29 @@ assign legal_instr =
         (funct3 == 3'b111 && funct7 == 7'b0000000) || // and
         (funct3 == 3'b110 && funct7 == 7'b0000000) || // or
         (funct3 == 3'b100 && funct7 == 7'b0000000) || // xor
-        (funct3 == 3'b010 && funct7 == 7'b0000000) || // slt
-        (funct3 == 3'b011 && funct7 == 7'b0000000) || // sltu
-        (funct3 == 3'b001 && funct7 == 7'b0000000) || // sll
-        (funct3 == 3'b101 && (funct7 == 7'b0000000 || funct7 == 7'b0100000))   // srl, sra
+        (funct3 == 3'b010) || // slt
+        (funct3 == 3'b011) || // sltu
+        (funct3 == 3'b001) || // sll
+        (funct3 == 3'b101)   // srl, sra
     )) ||
     // R-type W (opcode=0x3B)
     (opcode == 7'b0111011 && (
         (funct3 == 3'b000 && (funct7 == 7'b0000000 || funct7 == 7'b0100000)) || // addw, subw
-        (funct3 == 3'b001 && funct7 == 7'b0000000) || // sllw
-        (funct3 == 3'b101 && (funct7 == 7'b0000000 || funct7 == 7'b0100000))    // srlw, sraw
+        (funct3 == 3'b001) || // sllw
+        (funct3 == 3'b101)    // srlw, sraw
     )) ||
     // I-type (opcode=0x13)
     (opcode == 7'b0010011 && (
         (funct3 == 3'b000) || (funct3 == 3'b111) || (funct3 == 3'b110) || (funct3 == 3'b100) || // addi, andi, ori, xori
         (funct3 == 3'b010) || (funct3 == 3'b011) || // slti, sltiu
-        (funct3 == 3'b001 && funct7 == 7'b0000000) || // slli
-        (funct3 == 3'b101 && (funct7 == 7'b0000000 || funct7 == 7'b0100000))    // srli, srai
+        (funct3 == 3'b001) || // slli
+        (funct3 == 3'b101)    // srli, srai
     )) ||
     // I-type W (opcode=0x1B)
     (opcode == 7'b0011011 && (
         (funct3 == 3'b000) || // addiw
-        (funct3 == 3'b001 && funct7 == 7'b0000000) || // slliw
-        (funct3 == 3'b101 && (funct7 == 7'b0000000 || funct7 == 7'b0100000))    // srliw, sraiw
+        (funct3 == 3'b001) || // slliw
+        (funct3 == 3'b101)    // srliw, sraiw
     )) ||
     // Load (opcode=0x03)
     (opcode == 7'b0000011 && (
@@ -72,12 +72,9 @@ assign legal_instr =
     // I-type jalr (opcode=0x67, funct3=0)
     (opcode == 7'b1100111 && funct3 == 3'b000) ||
     // CSR (opcode=0x73)
-    (opcode == 7'b1110011 && (
-        (funct3 == 3'b001) || (funct3 == 3'b010) || (funct3 == 3'b011) || // csrrw, csrrs, csrrc
-        (funct3 == 3'b101) || (funct3 == 3'b110) || (funct3 == 3'b111) || // csrrwi, csrrsi, csrrci
-        (instr == 32'b000000000000_00000_000_00000_1110011 || 
-        instr == 32'b001100000010_00000_000_00000_1110011)   // ecall (0) , mret (0x302)
-    ));
+    (opcode == 7'b1110011) ||
+    // 气泡也是合法指令
+    (instr == 32'b0);
 
 // 非法指令信号
 assign illegal_instr = ~legal_instr;

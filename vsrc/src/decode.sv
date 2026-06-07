@@ -38,7 +38,9 @@ module decode import common::*, csr_pkg::*;(
     output logic [63:0] next_sie, next_sip, next_sepc, next_stval, next_stvec,
 			    next_scause, next_sscratch, next_mideleg, next_medeleg,
     output logic [1:0] next_mode, // 输出寄存器
-    input  logic illegal_instr, iaddr_misali, laddr_misali, saddr_misali);
+    input  logic illegal_instr, iaddr_misali, laddr_misali, saddr_misali,
+    input  logic trint, swint, exint,
+    input  logic clkint, extint, sfwint);
 
 // reg
 
@@ -258,6 +260,33 @@ always_comb begin
             next_mstatus[3] = 0;
             next_mode = 2'b11;
         end
+        else if (clkint) begin
+            next_mepc = pcW + 4;
+            next_mcause[63] = 1;
+            next_mcause[62:0] = 7;
+            next_mstatus[12:11] = mode;
+            next_mstatus[7] = mstatus[3];
+            next_mstatus[3] = 0;
+            next_mode = 2'b11;
+        end
+        else if (extint) begin
+            next_mepc = pcW + 4;
+            next_mcause[63] = 1;
+            next_mcause[62:0] = 11;
+            next_mstatus[12:11] = mode;
+            next_mstatus[7] = mstatus[3];
+            next_mstatus[3] = 0;
+            next_mode = 2'b11;
+        end
+        else if (sfwint) begin
+            next_mepc = pcW + 4;
+            next_mcause[63] = 1;
+            next_mcause[62:0] = 3;
+            next_mstatus[12:11] = mode;
+            next_mstatus[7] = mstatus[3];
+            next_mstatus[3] = 0;
+            next_mode = 2'b11;
+        end
     end
 end
 
@@ -268,7 +297,14 @@ assign ecall = instrW == 32'b000000000000_00000_000_00000_1110011;
 assign mret = instrW == 32'b001100000010_00000_000_00000_1110011;
 
 assign modewrite = ecall | mret | 
-                illegal_instr | iaddr_misali | laddr_misali | saddr_misali;
+                illegal_instr | iaddr_misali | laddr_misali | saddr_misali | 
+                clkint | extint | sfwint;
+
+always_ff @(posedge clk) begin
+    mip[7] <= trint;
+    mip[11] <= exint;
+    mip[3] <= swint;
+end
 
 always_ff @(posedge clk) begin
     if (reset) begin
