@@ -146,7 +146,7 @@ assign interruptionF = clkintD | extintD | sfwintD |
 always_ff @(posedge clk) begin
     if (reset) begin
     end else if (step) begin
-        if (!exceptionF && !interruptionF &&
+        if (estall == 0 && !exceptionF && !interruptionF &&
             (next_mode != 2'b11 || next_mode == 2'b11 && next_mstatus[3] == 1)) begin
             if (exint && next_mie[11] == 1)
                 extintD <= 1;
@@ -229,7 +229,7 @@ controller ctlr(clk, reset,
 
 always_comb begin
     if (instrD == 32'b000000000000_00000_000_00000_1110011 || 
-        illegal_instrD || iaddr_misaliD || laddr_misali || saddr_misaliD ||
+        illegal_instrD || iaddr_misaliD || laddr_misaliD || saddr_misaliD ||
         clkintD || extintD || sfwintD   
     ) epcD = 2'b01;
     else if (instrD == 32'b001100000010_00000_000_00000_1110011) epcD = 2'b10;

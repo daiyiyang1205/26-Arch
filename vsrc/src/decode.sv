@@ -261,7 +261,7 @@ always_comb begin
             next_mode = 2'b11;
         end
         else if (clkint) begin
-            next_mepc = pcW + 4;
+            next_mepc = pcW;
             next_mcause[63] = 1;
             next_mcause[62:0] = 7;
             next_mstatus[12:11] = mode;
@@ -270,7 +270,7 @@ always_comb begin
             next_mode = 2'b11;
         end
         else if (extint) begin
-            next_mepc = pcW + 4;
+            next_mepc = pcW;
             next_mcause[63] = 1;
             next_mcause[62:0] = 11;
             next_mstatus[12:11] = mode;
@@ -279,7 +279,7 @@ always_comb begin
             next_mode = 2'b11;
         end
         else if (sfwint) begin
-            next_mepc = pcW + 4;
+            next_mepc = pcW;
             next_mcause[63] = 1;
             next_mcause[62:0] = 3;
             next_mstatus[12:11] = mode;
