@@ -15,6 +15,7 @@ module fetch import common::*;(
     input  logic stall,
     input  logic [2:0] csrstall,
     input  logic [2:0] estall,
+    input  logic exception,
     input  logic [63:0] pcinit,
     input  logic [63:0] pcbranch,
     input  logic [63:0] pcjal,
@@ -60,19 +61,24 @@ always_ff @(posedge clk) begin
                 instr <= 32'b0;
                 fetch_ok <= 1;
             end
-            // 情况4：发生普通跳转
+            // 情况4：exception阻塞
+            else if (exception) begin
+                instr <= 32'b0;
+                fetch_ok <= 1;
+            end
+            // 情况5：发生普通跳转
             else if (nextpcsrc != 0) begin
                 instr <= 32'b0;
                 pc <= nextpc;
                 fetch_ok <= 1;
             end
-            // 情况5：发生特权跳转
+            // 情况6：发生特权跳转
             else if (epc != 0) begin
                 instr <= 32'b0;
                 pc <= nextpc;
                 fetch_ok <= 1;
             end
-            // 情况6：取当前pc指向的指令
+            // 情况7：取当前pc指向的指令
             else if (ibus_req.valid == 0) begin
                 ibus_req.valid <= 1;
                 ibus_req.addr <= pc;

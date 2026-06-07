@@ -37,7 +37,8 @@ module decode import common::*, csr_pkg::*;(
                 next_mcause, next_satp, next_mip, next_mie, next_mscratch,
     output logic [63:0] next_sie, next_sip, next_sepc, next_stval, next_stvec,
 			    next_scause, next_sscratch, next_mideleg, next_medeleg,
-    output logic [1:0] next_mode); // 输出寄存器
+    output logic [1:0] next_mode, // 输出寄存器
+    input  logic illegal_instr, iaddr_misali, laddr_misali, saddr_misali);
 
 // reg
 
@@ -221,6 +222,42 @@ always_comb begin
             next_mstatus[12:11] = 2'b00;
             next_mstatus[15:14] = 2'b00;
         end
+        else if (illegal_instr) begin
+            next_mepc = pcW;
+            next_mcause[63] = 0;
+            next_mcause[62:0] = 2;
+            next_mstatus[12:11] = mode;
+            next_mstatus[7] = mstatus[3];
+            next_mstatus[3] = 0;
+            next_mode = 2'b11;
+        end
+        else if (iaddr_misali) begin
+            next_mepc = pcW;
+            next_mcause[63] = 0;
+            next_mcause[62:0] = 0;
+            next_mstatus[12:11] = mode;
+            next_mstatus[7] = mstatus[3];
+            next_mstatus[3] = 0;
+            next_mode = 2'b11;
+        end
+        else if (laddr_misali) begin
+            next_mepc = pcW;
+            next_mcause[63] = 0;
+            next_mcause[62:0] = 4;
+            next_mstatus[12:11] = mode;
+            next_mstatus[7] = mstatus[3];
+            next_mstatus[3] = 0;
+            next_mode = 2'b11;
+        end
+        else if (saddr_misali) begin
+            next_mepc = pcW;
+            next_mcause[63] = 0;
+            next_mcause[62:0] = 6;
+            next_mstatus[12:11] = mode;
+            next_mstatus[7] = mstatus[3];
+            next_mstatus[3] = 0;
+            next_mode = 2'b11;
+        end
     end
 end
 
@@ -230,7 +267,8 @@ assign ecall = instrW == 32'b000000000000_00000_000_00000_1110011;
 
 assign mret = instrW == 32'b001100000010_00000_000_00000_1110011;
 
-assign modewrite = ecall | mret;
+assign modewrite = ecall | mret | 
+                illegal_instr | iaddr_misali | laddr_misali | saddr_misali;
 
 always_ff @(posedge clk) begin
     if (reset) begin

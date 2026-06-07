@@ -8,6 +8,7 @@
 `include "src/decode.sv"
 `include "src/execute.sv"
 `include "src/memory.sv"
+`include "src/exception.sv"
 `endif
 
 module datapath import common::*;(
@@ -84,6 +85,49 @@ always_ff @(posedge clk) begin
     end
 end
 
+// Exception
+
+logic exceptionF;
+
+logic illegal_instr, iaddr_misali, laddr_misali, saddr_misali;
+
+logic illegal_instrD, illegal_instrE, illegal_instrM, illegal_instrW;
+
+logic iaddr_misaliD, iaddr_misaliE, iaddr_misaliM, iaddr_misaliW;
+
+logic laddr_misaliD, laddr_misaliE, laddr_misaliM, laddr_misaliW;
+
+logic saddr_misaliD, saddr_misaliE, saddr_misaliM, saddr_misaliW;
+
+logic [63:0] addr;
+
+assign addr = true_readData1D + seimmD;
+
+assign illegal_instr = illegal_instrD | illegal_instrE | illegal_instrM;
+
+assign iaddr_misali = iaddr_misaliD | iaddr_misaliE | iaddr_misaliM;
+
+assign laddr_misali = laddr_misaliD | laddr_misaliE | laddr_misaliM;
+
+assign saddr_misali = saddr_misaliD | saddr_misaliE | saddr_misaliM;
+
+assign exceptionF = illegal_instr | iaddr_misali | laddr_misali | saddr_misali;
+
+exception exc(instrD, pcbranch, pcjal, pcjalr, brch, addr,
+            illegal_instrD, iaddr_misaliD, laddr_misaliD, saddr_misaliD);
+
+enreg #(4) eregDE(clk, reset, step,
+                {illegal_instrD, iaddr_misaliD, laddr_misaliD, saddr_misaliD},
+                {illegal_instrE, iaddr_misaliE, laddr_misaliE, saddr_misaliE});
+
+enreg #(4) eregEM(clk, reset, step,
+                {illegal_instrE, iaddr_misaliE, laddr_misaliE, saddr_misaliE}, 
+                {illegal_instrM, iaddr_misaliM, laddr_misaliM, saddr_misaliM});
+
+enreg #(4) eregMW(clk, reset, step,
+                {illegal_instrM, iaddr_misaliM, laddr_misaliM, saddr_misaliM},
+                {illegal_instrW, iaddr_misaliW, laddr_misaliW, saddr_misaliW});
+
 // controller
 
 logic regwriteD, regwriteE, regwriteM;
@@ -142,7 +186,9 @@ controller ctlr(clk, reset,
             nextpcsrc);
 
 always_comb begin
-    if (instrD == 32'b000000000000_00000_000_00000_1110011) epcD = 2'b01;
+    if (instrD == 32'b000000000000_00000_000_00000_1110011 || 
+        illegal_instrD || iaddr_misaliD || laddr_misali || saddr_misaliD    
+    ) epcD = 2'b01;
     else if (instrD == 32'b001100000010_00000_000_00000_1110011) epcD = 2'b10;
     else epcD = 2'b00;
 end
@@ -209,6 +255,7 @@ fetch fetch(clk, reset, step,
             stall,
             csrstall,
             estall,
+            exceptionF,
             pcinit,
             pcbranch,
             pcjal,
@@ -252,7 +299,8 @@ decode decode(clk, reset, step,
             next_mcause, next_satp, next_mip, next_mie, next_mscratch,
             next_sie, next_sip, next_sepc, next_stval, next_stvec,
 			next_scause, next_sscratch, next_mideleg, next_medeleg,
-            next_mode);
+            next_mode,
+            illegal_instrW, iaddr_misaliW, laddr_misaliW, saddr_misaliW);
 
 // forward
 
