@@ -152,7 +152,13 @@ assign interruptionF = clkintD | extintD | sfwintD |
 
 always_ff @(posedge clk) begin
     if (reset) begin
+        extintD <= 0;
+        clkintD <= 0;
+        sfwintD <= 0;
     end else if (step) begin
+        extintD <= 0;
+        clkintD <= 0;
+        sfwintD <= 0;
         if (instrF[6:0] != 7'b1110011 && instrD[6:0] != 7'b1110011 &&
             instrE[6:0] != 7'b1110011 && instrM[6:0] != 7'b1110011 &&
             instrW[6:0] != 7'b1110011 &&
