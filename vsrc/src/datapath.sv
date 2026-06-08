@@ -160,8 +160,6 @@ always_ff @(posedge clk) begin
         clkintD <= 0;
         sfwintD <= 0;
         if (instrF[6:0] != 7'b1110011 && instrD[6:0] != 7'b1110011 &&
-            instrE[6:0] != 7'b1110011 && instrM[6:0] != 7'b1110011 &&
-            instrW[6:0] != 7'b1110011 &&
             !estall && !exceptionF && !interruptionF &&
             (next_mode != 2'b11 || next_mode == 2'b11 && next_mstatus[3] == 1)) begin
             if (next_mip[11] == 1 && next_mie[11] == 1)
