@@ -2,20 +2,19 @@
 `include "include/common.sv"
 `endif
 
-module mmu import common::*;(
+module mmu_v import common::*;(
     input  logic clk, reset,
-    output logic trint, swint, exint,
     input  logic [1:0] mode,
     input  logic [63:0] satp,
     input  cbus_req_t vreq,
-    output logic [63:0] paddr,
-    output cbus_resp_t presp
+    output cbus_resp_t vresp,
+    output cbus_req_t oreq,
+    input  cbus_resp_t oresp,
+    output logic [63:0] paddr
 );
 
     logic mmu_valid;
     cbus_req_t  oreq_reg;          // 分时复用的请求寄存器
-    cbus_req_t  oreq;              // 实际驱动 RAMHelper2 的请求
-    cbus_resp_t oresp;            // RAMHelper2 的响应
 
     logic [3:0] status;
     logic [63:0] base1, base2, base3;
@@ -40,20 +39,9 @@ module mmu import common::*;(
     assign paddr = mmu_valid ? {8'b0, data3[53:10], vreq.addr[11:0]} : vreq.addr;
 
     // 仅当 MMU 使能且处于物理地址响应阶段时，才向外部暴露响应
-    assign presp = mmu_valid ? 
+    assign vresp = mmu_valid ? 
                     ((status == 4'b0111) ? oresp : cbus_resp_t'{ready:0, last:0, data:0})
                     : oresp;
-
-    // 唯一的一个 RAM 助手实例
-    RAMHelper2 ram (
-        .clk   (clk),
-        .reset (reset),
-        .oreq  (oreq),
-        .oresp (oresp),
-        .trint (trint),
-        .swint (swint),
-        .exint (exint)
-    );
 
     always_ff @(posedge clk) begin
         if (reset) begin

@@ -13,13 +13,23 @@ module mmu_v import common::*;(
     output logic [63:0] paddr
 );
 
+    // 叶子判断函数
+    function automatic logic is_leaf(input logic [63:0] pte);
+        // V=1 且 (R|W|X) != 0
+        is_leaf = pte[0] && (|pte[3:1]);
+    endfunction
+
     logic mmu_valid;
-    cbus_req_t  oreq_reg;          // 分时复用的请求寄存器
+    cbus_req_t oreq_reg;          // 分时复用的请求寄存器
 
     logic [3:0] status;
     logic [63:0] base1, base2, base3;
     logic [63:0] id1, id2, id3;
     logic [63:0] data1, data2, data3;
+
+    // 巨页叶子信息
+    logic [63:0] leaf_pte;
+    logic [1:0]  leaf_level;       // 2: 1GiB, 1: 2MiB, 0: 4KiB
 
     assign mmu_valid = (mode == 2'b00 && satp[63:60] == 4'b1000);
 
@@ -36,7 +46,19 @@ module mmu_v import common::*;(
     assign base3 = {8'b0, data2[53:10], 12'b0};
     assign id3   = {55'b0, vreq.addr[20:12]};
 
-    assign paddr = mmu_valid ? {8'b0, data3[53:10], vreq.addr[11:0]} : vreq.addr;
+    // 物理地址输出（根据叶子级别组合）
+    always_comb begin
+        if (!mmu_valid) begin
+            paddr = vreq.addr;
+        end else begin
+            unique case (leaf_level)
+                2: paddr = {8'b0, leaf_pte[53:28], vreq.addr[29:0]};   // 1GiB 巨页
+                1: paddr = {8'b0, leaf_pte[53:19], vreq.addr[20:0]};   // 2MiB 巨页
+                0: paddr = {8'b0,  leaf_pte[53:10], vreq.addr[11:0]};   // 4KiB 普通页
+                default: paddr = vreq.addr;
+            endcase
+        end
+    end
 
     // 仅当 MMU 使能且处于物理地址响应阶段时，才向外部暴露响应
     assign vresp = mmu_valid ? 
@@ -45,16 +67,20 @@ module mmu_v import common::*;(
 
     always_ff @(posedge clk) begin
         if (reset) begin
-            status    <= 4'b0000;
-            oreq_reg  <= '0;
-            data1     <= '0;
-            data2     <= '0;
-            data3     <= '0;
+            status     <= 4'b0000;
+            oreq_reg   <= '0;
+            data1      <= '0;
+            data2      <= '0;
+            data3      <= '0;
+            leaf_pte   <= '0;
+            leaf_level <= 2'b0;
         end
         else if (!mmu_valid) begin
             // 非 MMU 模式或模式切换时复位状态机
-            status   <= 4'b0000;
-            oreq_reg <= '0;
+            status     <= 4'b0000;
+            oreq_reg   <= '0;
+            leaf_pte   <= '0;
+            leaf_level <= 2'b0;
         end
         else begin
             case (status)
@@ -65,7 +91,6 @@ module mmu_v import common::*;(
                         oreq_reg.addr    <= base1 + (id1 << 3);
                         oreq_reg.len     <= MLEN1;
                         oreq_reg.burst   <= AXI_BURST_FIXED;
-                        // 读请求无需写信号，保持默认 0
                         oreq_reg.is_write <= 1'b0;
                         oreq_reg.strobe  <= '0;
                         oreq_reg.data    <= '0;
@@ -77,7 +102,14 @@ module mmu_v import common::*;(
                     if (oresp.ready && oresp.last) begin
                         data1 <= oresp.data;
                         oreq_reg.valid <= 1'b0;
-                        status <= 4'b0010;
+                        if (is_leaf(oresp.data)) begin
+                            // 1GiB 巨页，直接跳转到物理请求
+                            leaf_pte   <= oresp.data;
+                            leaf_level <= 2;
+                            status <= 4'b0110;
+                        end else begin
+                            status <= 4'b0010;
+                        end
                     end
                 end
 
@@ -94,7 +126,14 @@ module mmu_v import common::*;(
                     if (oresp.ready && oresp.last) begin
                         data2 <= oresp.data;
                         oreq_reg.valid <= 1'b0;
-                        status <= 4'b0100;
+                        if (is_leaf(oresp.data)) begin
+                            // 2MiB 巨页
+                            leaf_pte   <= oresp.data;
+                            leaf_level <= 1;
+                            status <= 4'b0110;
+                        end else begin
+                            status <= 4'b0100;
+                        end
                     end
                 end
 
@@ -111,6 +150,9 @@ module mmu_v import common::*;(
                     if (oresp.ready && oresp.last) begin
                         data3 <= oresp.data;
                         oreq_reg.valid <= 1'b0;
+                        // 第三级必须是叶子（否则缺页，此处假定有效）
+                        leaf_pte   <= oresp.data;
+                        leaf_level <= 0;
                         status <= 4'b0110;
                     end
                 end
@@ -119,7 +161,13 @@ module mmu_v import common::*;(
                     oreq_reg.valid    <= 1'b1;
                     oreq_reg.is_write <= vreq.is_write;
                     oreq_reg.size     <= vreq.size;
-                    oreq_reg.addr     <= paddr;
+                    // 根据叶子级别计算物理地址
+                    unique case (leaf_level)
+                        2: oreq_reg.addr <= {8'b0, leaf_pte[53:28], vreq.addr[29:0]};
+                        1: oreq_reg.addr <= {8'b0, leaf_pte[53:19], vreq.addr[20:0]};
+                        0: oreq_reg.addr <= {8'b0, leaf_pte[53:10], vreq.addr[11:0]};
+                        default: oreq_reg.addr <= vreq.addr;
+                    endcase
                     oreq_reg.strobe   <= vreq.strobe;
                     oreq_reg.data     <= vreq.data;
                     oreq_reg.len      <= vreq.len;
