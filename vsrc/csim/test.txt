@@ -1,0 +1,146 @@
+// ============================================
+// MESI Cache Coherence Test Trace
+// C++ 模拟器输入格式示例：
+// [timestamp] [core_id] [type: R/W] [addr] [size]
+// 覆盖场景: read miss, write miss, invalidate, write back, 
+//          shared-to-modified, modified-to-shared, silent upgrade 等
+// ============================================
+
+// === 场景 1: 初始 Read Miss (I -> E/S) ===
+// Core 0 首次读取，cache line 无效，产生 read miss
+// 预期: I -> E (如果其他 core 没有该 line)
+1000000 0 R 0x1000 8
+
+// === 场景 2: 另一 Core 读取同一地址 (E -> S, 或 I -> S) ===
+// Core 1 读取同一 cache line，Core 0 的 E 状态变为 S
+// 预期: Core0: E->S, Core1: I->S (共享状态)
+1000001 1 R 0x1000 8
+
+// === 场景 3: 第三 Core 读取 (S -> S) ===
+// Core 2 也读取，三个 core 共享
+1000002 2 R 0x1000 4
+
+// === 场景 4: Write Hit on Shared (S -> M, 发送 Invalidations) ===
+// Core 0 写入，需要 invalidate Core1 和 Core2 的副本
+// 预期: Core0: S->M, Core1: S->I, Core2: S->I
+1000010 0 W 0x1000 8
+
+// === 场景 5: 被 Invalidate 的 Core 重新读取 (I -> S, 从 M 写回) ===
+// Core 1 读取已被 invalidate 的地址，需要从 Core0 的 M 状态写回
+// 预期: Core0: M->S, Core1: I->S, 触发 write back
+1000020 1 R 0x1000 8
+
+// === 场景 6: 另一 Core 写入 Shared (S -> I, 对方 S -> M) ===
+// Core 2 写入当前 S 状态的 line，Core0 和 Core1 被 invalidate
+// 预期: Core0: S->I, Core1: S->I, Core2: I->M
+1000030 2 W 0x1000 8
+
+// === 场景 7: 独占读取后写入 (E -> M, silent upgrade) ===
+// Core 0 读取新地址，获得 E 状态
+1000100 0 R 0x2000 8
+// Core 0 立即写入同一地址，E -> M (silent upgrade，无需总线事务)
+1000101 0 W 0x2000 8
+
+// === 场景 8: 多地址交错访问，测试 write back 时机 ===
+// Core 0 写入地址 0x3000，获得 M
+1000200 0 W 0x3000 8
+// Core 1 写入同一地址，Core 0 需要 write back 并 invalidate
+// 预期: Core0: M->I (write back), Core1: I->M
+1000201 1 W 0x3000 8
+
+// === 场景 9: 不同 cache line 的并行访问 (无冲突) ===
+// 三个 core 访问不同地址，各自获得 E/M 状态
+1000300 0 R 0x4000 8
+1000301 1 R 0x5000 8
+1000302 2 R 0x6000 8
+1000310 0 W 0x4000 8
+1000311 1 W 0x5000 8
+1000312 2 W 0x6000 8
+
+// === 场景 10: 部分字写入，测试 write mask / read-modify-write ===
+// Core 0 读取 8 字节
+1000400 0 R 0x7000 8
+// Core 0 写入 4 字节（前半部分）
+1000401 0 W 0x7000 4
+// Core 1 读取同一 cache line（大小不同）
+1000410 1 R 0x7000 8
+
+// === 场景 11: 同一 Core 连续写入同一地址 (M -> M, 无总线事务) ===
+1000500 0 W 0x8000 8
+1000501 0 W 0x8000 8
+1000502 0 W 0x8000 8
+
+// === 场景 12: 地址别名/同一 cache line 的不同 offset ===
+// 假设 cache line size = 64 bytes，0x9000 和 0x9038 在同一 line
+1000600 0 R 0x9000 8
+1000601 1 R 0x9038 8
+// Core 0 写入同一 line 的不同位置，触发 invalidate
+1000610 0 W 0x9000 8
+
+// === 场景 13: 四个 core 竞争同一地址 (高冲突) ===
+// 初始状态: 全部 I
+1000700 0 R 0xA000 8   // C0: I->E
+1000701 1 R 0xA000 8   // C0: E->S, C1: I->S
+1000702 2 R 0xA000 8   // C2: I->S
+1000703 3 R 0xA000 8   // C3: I->S (四路共享)
+1000710 0 W 0xA000 8   // C0: S->M, C1/C2/C3: S->I
+1000720 1 W 0xA000 8   // C0: M->I (write back), C1: I->M
+1000730 2 W 0xA000 8   // C1: M->I (write back), C2: I->M
+1000740 3 W 0xA000 8   // C2: M->I (write back), C3: I->M
+
+// === 场景 14: 读写混合，测试 ownership ===
+1000800 0 R 0xB000 8   // C0: I->E
+1000801 0 W 0xB000 8   // C0: E->M
+1000802 1 R 0xB000 8   // C0: M->O (如果实现 O 状态) 或 M->S, C1: I->S
+                        // 注: 纯 MESI 无 O 状态，应为 M->S
+
+// === 场景 15: 大小端/不同 size 访问同一 line ===
+1000900 0 R 0xC000 1
+1000901 1 R 0xC002 2   // 2 字节对齐
+1000902 2 R 0xC004 4   // 4 字节对齐
+1000910 0 W 0xC000 8
+
+// === 场景 16: 快速切换，测试竞争条件 ===
+1001000 0 R 0xD000 8
+1001001 1 W 0xD000 8
+1001002 2 R 0xD000 8
+1001003 3 W 0xD000 8
+1001004 0 R 0xD000 8
+1001005 1 W 0xD000 8
+
+// === 场景 17: 长时间运行，测试稳定性 ===
+1100000 0 R 0x20000 8
+1100001 1 R 0x20000 8
+1100002 0 W 0x20000 8
+1100010 2 R 0x20000 8
+1100011 3 W 0x20000 8
+1100020 1 R 0x20000 8
+1100030 0 R 0x20000 8
+
+// === 场景 18: 单 core 独占后其他 core 只读不写的 ping-pong ===
+1200000 0 W 0x30000 8   // C0: M
+1200010 1 R 0x30000 8   // C0: M->S, C1: I->S
+1200020 2 R 0x30000 8   // C2: I->S
+1200030 3 R 0x30000 8   // C3: I->S (四路共享)
+1200040 0 W 0x30000 8   // C0: S->M, others: S->I (invalidate storm)
+
+// === 场景 19: 不同 core 访问相邻 cache line (false sharing 边界) ===
+1300000 0 W 0x40000 8   // Line A
+1300001 1 W 0x40040 8   // Line B (相邻但不同 line，无冲突)
+1300010 0 R 0x40000 8
+1300011 1 R 0x40040 8
+
+// === 场景 20: 真共享 (true sharing，同一 line 不同 word) ===
+1310000 0 W 0x50000 4   // Word 0 in line
+1310001 1 W 0x50004 4   // Word 1 in same line (同一 line 竞争！)
+
+// === 场景 21: 最终状态检查 ===
+// 让各个 core 读取之前写入的地址，验证最终一致性
+1400000 0 R 0x1000 8
+1400001 1 R 0x2000 8
+1400002 2 R 0x3000 8
+1400003 3 R 0x4000 8
+1400010 0 R 0xA000 8
+1400011 1 R 0xB000 8
+1400012 2 R 0xC000 8
+1400013 3 R 0xD000 8
